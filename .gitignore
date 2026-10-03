@@ -1,0 +1,20 @@
+# Keil MDK 编译产物
+MDK-ARM/Listings/
+MDK-ARM/Objects/
+MDK-ARM/DebugConfig/
+MDK-ARM/*.uvguix.*
+MDK-ARM/*.scvd
+MDK-ARM/JLinkLog.txt
+MDK-ARM/*.dep
+MDK-ARM/*.htm
+MDK-ARM/2027_Embedded_Buff_Master/
+
+# 编辑器/系统
+.vscode/
+*.bak
+*.orig
+Thumbs.db
+.DS_Store
+
+# CubeMX 备份
+*.ioc.bak
