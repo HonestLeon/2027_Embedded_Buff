@@ -211,6 +211,9 @@ static void send_cmd(bf_cmd_t cmd, uint8_t panel_a, uint8_t panel_b, uint8_t rou
     (void)buff_send_frame(&f);
 }
 
+/* 帧内 [6]=round 的语义(规则"中部灯臂指示激活进度"):
+ *   round = 已成功激活的组数(0~5), 从机据此显示 n/5 的进度条。
+ *   例: 第 1 组点亮时 round=0; 第 1 组被击中后开始第 2 组时 round=1(进度 1/5)…全亮时 round=5(5/5)。 */
 static void send_all_on(void)
 {
     for (uint8_t p = 1u; p <= BUFF_PANEL_NUM; p++)
@@ -409,8 +412,8 @@ void buff_tick(float dt)
     switch (s_state)
     {
     case BB_LIT:
-        /* BUFF_FIRST_HIT_TIMEOUT_EN=0(默认/老行为): 第一块不设计时, 从第二块起 2.5s 无击打复位
-           =1(按 2026 规则): 任何被点亮的装甲模块都受 2.5s 约束 */
+        /* BUFF_FIRST_HIT_TIMEOUT_EN=0(当前设置): 第一块不设计时, 从第二块起 2.5s 无击打复位
+           =1: 任何被点亮的装甲模块(含第一块)都受 2.5s 约束 */
         if ((BUFF_FIRST_HIT_TIMEOUT_EN || s_round >= 2u) &&
             s_t_state >= ((float)BUFF_HIT_TIMEOUT_MS / 1000.0f))
         {
