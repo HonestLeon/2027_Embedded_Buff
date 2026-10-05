@@ -101,7 +101,6 @@ int main(void)
   MX_CAN1_Init();
   MX_RNG_Init();
   MX_TIM3_Init();
-  MX_TIM4_Init();
   MX_TIM6_Init();
   MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
