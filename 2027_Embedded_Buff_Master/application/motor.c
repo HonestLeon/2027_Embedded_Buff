@@ -60,10 +60,29 @@ static motor_ctrl_t  s_ctrl;
 static zero_check_t  s_zero;
 static motor_fb_t    s_fb[MOTOR_NUM];
 
+volatile struct
+{
+    int16_t  fb_angle;
+    int16_t  fb_speed;
+    float    target;
+    float    position;
+    float    delat;
+    float    cmd_current;
+    uint32_t fb_frames;
+} g_dbg_motor;
+
 static bool          s_run;         /* SW_RUN: 转=1 */
 static bool          s_big;         /* SW_BUFF: 大符=1 */
 static float         s_speed_t;     /* 正弦相位积分(s), 停转时清零 */
 static uint16_t      s_tx_div;      /* 0x200 发帧分频(见 MOTOR_TX_PERIOD_MS) */
+static uint32_t      s_fb_frames;   /* 累计收到的电机反馈帧数 */
+
+/* ── 电机环调试快照(长期保留, ~30 字节) ─────────────────────
+ * 调试器 Watch `g_dbg_motor` 一眼看清闭环状态:
+ *   fb_frames : 是否在增长 → 电调反馈有没有进来(速度环是否真的闭环!)
+ *   fb_speed  : 反馈转速(rpm);  fb_angle: 反馈角度(0~8191)
+ *   target    : 目标位置(电机圈), 小符应约 25.58 圈/秒; position: 实际位置
+ *   delat     : 位置误差;      cmd_current: 本次发出的电流指令 */
 
 /* ── 限幅(老代码 LIMIT_MAX_MIN 宏) ──────────────────────── */
 static float clamp_f(float x, float max, float min)
@@ -139,6 +158,7 @@ void motor_on_feedback(uint32_t id, const uint8_t raw[8])
         return;                             /* 非电机反馈帧 */
     }
     idx = (uint8_t)(id - CAN_ID_MOTOR_FB_BASE);
+    s_fb_frames++;
 
     s_fb[idx].angle      = (int16_t)((raw[0] << 8) | raw[1]);
     s_fb[idx].real_speed = (int16_t)((raw[2] << 8) | raw[3]);
@@ -207,7 +227,16 @@ void motor_update(float dt)
     }
     cur = clamp_f(cur, (float)MOTOR_CUR_LIMIT, -(float)MOTOR_CUR_LIMIT);
 
-    /* ⑦ 发 0x200 电流帧: 槽位 1 = 本电机, 其余 0(老 CAN_Motor_Send1 行为)
+    /* ⑦ 调试快照(仅观测, 不影响控制) */
+    g_dbg_motor.fb_angle    = s_fb[0].angle;
+    g_dbg_motor.fb_speed    = s_fb[0].real_speed;
+    g_dbg_motor.target      = s_ctrl.target;
+    g_dbg_motor.position    = s_ctrl.position;
+    g_dbg_motor.delat       = s_ctrl.delat;
+    g_dbg_motor.cmd_current = cur;
+    g_dbg_motor.fb_frames   = s_fb_frames;
+
+    /* ⑧ 发 0x200 电流帧: 槽位 1 = 本电机, 其余 0(老 CAN_Motor_Send1 行为)
        发送周期由 MOTOR_TX_PERIOD_MS 控制(控制环仍是 1ms) */
     if (++s_tx_div < MOTOR_TX_PERIOD_MS)
     {
