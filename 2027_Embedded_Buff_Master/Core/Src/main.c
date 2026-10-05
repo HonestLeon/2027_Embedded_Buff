@@ -26,7 +26,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdlib.h>
+#include "bsp_ws2812.h"
+#include "bsp_switch.h"
+#include "bsp_can.h"
+#include "bsp_rng.h"
+#include "motor.h"
+#include "buff.h"
+#include "light.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -98,13 +105,24 @@ int main(void)
   MX_TIM6_Init();
   MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
-
+  /* 初始化序列(顺序见《代码架构设计》四.3):
+     ①等 WS2812 供电稳 → ②各模块 init → ③最后启动 1ms 调度中断 */
+  HAL_Delay(100);                   /* 等 WS2812 供电稳 */
+  bsp_ws2812_init();
+  bsp_switch_init();
+  bsp_can_init();
+  srand(bsp_rng_get_seed());
+  motor_init();
+  buff_init();
+  light_init();
+  HAL_TIM_Base_Start_IT(&htim6);    //中断调度开始
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    //__WFI();    /* 空转等中断: 调度全在 TIM6(主循环保持为空是架构纪律) */
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

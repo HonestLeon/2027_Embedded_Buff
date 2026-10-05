@@ -1,20 +1,41 @@
-# Keil MDK 编译产物
-MDK-ARM/Listings/
-MDK-ARM/Objects/
-MDK-ARM/DebugConfig/
-MDK-ARM/*.uvguix.*
-MDK-ARM/*.scvd
-MDK-ARM/JLinkLog.txt
-MDK-ARM/*.dep
-MDK-ARM/*.htm
-MDK-ARM/2027_Embedded_Buff_Master/
+# ── Keil MDK 构建产物（各工程 MDK-ARM 下的子目录与产物文件）──
+**/MDK-ARM/*/
+**/MDK-ARM/*.uvguix.*
+**/MDK-ARM/*.scvd
+**/MDK-ARM/*.dep
+**/MDK-ARM/*.lst
+**/MDK-ARM/*.htm
+**/MDK-ARM/*.map
+**/MDK-ARM/*.o
+**/MDK-ARM/*.d
+**/MDK-ARM/*.crf
+**/MDK-ARM/*.axf
+**/MDK-ARM/*.lnp
+**/MDK-ARM/*.iex
+**/MDK-ARM/*.sct
+**/MDK-ARM/*.hex
+**/MDK-ARM/*.bin
+**/MDK-ARM/*.build_log.htm
+**/MDK-ARM/JLinkLog.txt
+**/MDK-ARM/JLinkSettings.ini
 
-# 编辑器/系统
+# ── 编辑器/系统 ──
 .vscode/
+.idea/
 *.bak
 *.orig
+*~
 Thumbs.db
 .DS_Store
+desktop.ini
 
-# CubeMX 备份
+# ── CubeMX 备份 ──
 *.ioc.bak
+.mxproject.bak
+
+# ── 临时/工具产物 ──
+__pycache__/
+*.pyc
+*.log
+_page1*.txt
+_cubemx_guide.txt

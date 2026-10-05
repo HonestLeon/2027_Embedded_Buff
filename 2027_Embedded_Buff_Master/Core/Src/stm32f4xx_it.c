@@ -22,6 +22,12 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "config_board.h"
+#include "bsp_ws2812.h"
+#include "bsp_switch.h"
+#include "motor.h"
+#include "buff.h"
+#include "light.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -421,5 +427,31 @@ void CAN2_RX0_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
+/* 调度心跳(长期保留, 4 字节): TIM6 中断每 1ms +1。
+   debugger 里 Watch 它可快速判断"调度是否在跑"(为 0 或不变 = 中断没进) */
+volatile uint32_t g_sched_tick_cnt = 0;
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim == &htim6)
+  {
+    static uint16_t frame_div = 0;
+
+    g_sched_tick_cnt++;
+
+    /* ── 1ms 节拍 ───────────────────────────────── */
+    motor_update(0.001f);              /* TODO P5: 排空CAN2反馈+PID+0x200 */
+    bsp_ws2812_refresh_all();          /* dirty灯带刷新(P2完成, 每tick≤2条) */
+    buff_tick(0.001f);                 /* TODO P6: 2.5s/1s 超时计时 */
+
+    /* ── 4Hz 逻辑帧 ─────────────────────────── */
+    if (++frame_div >= SCHED_FRAME_DIV)
+    {
+      frame_div = 0;
+      bsp_switch_poll();               /* 拨码采样(消抖) */
+      buff_step();                     /* TODO P6: CAN1出队+状态机 */
+      light_tick();                    /* 本地灯效(P3完成, 含SW_DEBUG白光测试) */
+    }
+  }
+}
 /* USER CODE END 1 */

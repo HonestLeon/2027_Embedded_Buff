@@ -207,7 +207,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
     /* TIM3_CH1_TRIG Init */
     hdma_tim3_ch1_trig.Instance = DMA1_Stream4;
     hdma_tim3_ch1_trig.Init.Channel = DMA_CHANNEL_5;
-    hdma_tim3_ch1_trig.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_tim3_ch1_trig.Init.Direction = DMA_MEMORY_TO_PERIPH;
     hdma_tim3_ch1_trig.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_tim3_ch1_trig.Init.MemInc = DMA_MINC_ENABLE;
     hdma_tim3_ch1_trig.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
@@ -228,7 +228,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
     /* TIM3_CH2 Init */
     hdma_tim3_ch2.Instance = DMA1_Stream5;
     hdma_tim3_ch2.Init.Channel = DMA_CHANNEL_5;
-    hdma_tim3_ch2.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_tim3_ch2.Init.Direction = DMA_MEMORY_TO_PERIPH;
     hdma_tim3_ch2.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_tim3_ch2.Init.MemInc = DMA_MINC_ENABLE;
     hdma_tim3_ch2.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
@@ -246,7 +246,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
     /* TIM3_CH4_UP Init */
     hdma_tim3_ch4_up.Instance = DMA1_Stream2;
     hdma_tim3_ch4_up.Init.Channel = DMA_CHANNEL_5;
-    hdma_tim3_ch4_up.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_tim3_ch4_up.Init.Direction = DMA_MEMORY_TO_PERIPH;
     hdma_tim3_ch4_up.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_tim3_ch4_up.Init.MemInc = DMA_MINC_ENABLE;
     hdma_tim3_ch4_up.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
@@ -280,7 +280,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
     /* TIM4_CH1 Init */
     hdma_tim4_ch1.Instance = DMA1_Stream0;
     hdma_tim4_ch1.Init.Channel = DMA_CHANNEL_2;
-    hdma_tim4_ch1.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_tim4_ch1.Init.Direction = DMA_MEMORY_TO_PERIPH;
     hdma_tim4_ch1.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_tim4_ch1.Init.MemInc = DMA_MINC_ENABLE;
     hdma_tim4_ch1.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
@@ -298,7 +298,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
     /* TIM4_CH2 Init */
     hdma_tim4_ch2.Instance = DMA1_Stream3;
     hdma_tim4_ch2.Init.Channel = DMA_CHANNEL_2;
-    hdma_tim4_ch2.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_tim4_ch2.Init.Direction = DMA_MEMORY_TO_PERIPH;
     hdma_tim4_ch2.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_tim4_ch2.Init.MemInc = DMA_MINC_ENABLE;
     hdma_tim4_ch2.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
@@ -316,7 +316,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
     /* TIM4_CH3 Init */
     hdma_tim4_ch3.Instance = DMA1_Stream7;
     hdma_tim4_ch3.Init.Channel = DMA_CHANNEL_2;
-    hdma_tim4_ch3.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_tim4_ch3.Init.Direction = DMA_MEMORY_TO_PERIPH;
     hdma_tim4_ch3.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_tim4_ch3.Init.MemInc = DMA_MINC_ENABLE;
     hdma_tim4_ch3.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
