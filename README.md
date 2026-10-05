@@ -65,6 +65,8 @@ STM32F405RGT6 + HAL，Keil MDK-ARM 工程，由 STM32CubeMX 6.15 生成。
 |---|---|---|
 | `g_sched_tick_cnt` | `Core/Src/stm32f4xx_it.c` | 调度心跳：1ms 中断每 tick +1，为 0 或不动 = 中断没进 |
 | `g_dbg_ws_scan_idx` | `application/light.c` | 灯带通道扫描：`DEBUG_TEST_MODE=1` 时该值 = 当前点亮灯带的索引（0xFF=未扫描） |
+| `g_dbg_buff_state` / `g_dbg_buff_round` | `application/buff.c` | 大小符状态机状态与轮次（对照转换表看流程） |
+| `g_dbg_can1_rx_frames` | `application/buff.c` | 收到的从机回报帧累计数 |
 | `g_dbg_motor` | `application/motor.c` | 电机环快照：`fb_frames`(反馈帧累计, 判断速度环是否闭环)、`fb_speed`/`fb_angle`、`target`/`position`/`delat`、`cmd_current` |
 
 ## 文档（`docs/`）
