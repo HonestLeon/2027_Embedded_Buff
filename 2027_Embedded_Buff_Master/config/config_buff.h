@@ -14,4 +14,10 @@
    如需老时序, 把熄灭→点亮的衔接放到 1ms 节拍处理, 勿在中断里死等 */
 #define BUFF_RANDOM_ARRAY_LEN    5
 
+/* ── P4 联调临时开关 ──
+ * 1 = buff_step() 每 4Hz 发一帧 0x161(全复位) 并把 CAN1 收到的从机帧排空计数,
+ *     用于 CAN 盒/从机联调验证收发链路(看 g_dbg_can1_rx_frames);
+ * 0 = 关闭(P6 实现大小符状态机后置 0)。 */
+#define BUFF_P4_CAN_TEST         1
+
 #endif /* CONFIG_BUFF_H */

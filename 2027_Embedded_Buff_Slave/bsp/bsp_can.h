@@ -17,7 +17,9 @@ bool     bsp_can1_send(uint32_t id, const uint8_t data[8]);   /* 从机总线 */
 bool     bsp_can2_send(uint32_t id, const uint8_t data[8]);   /* 电机总线 */
 bool     bsp_can1_pop(uint32_t *id, uint8_t data[8]);         /* 从机帧队列 */
 bool     bsp_can2_pop(uint32_t *id, uint8_t data[8]);         /* 电机反馈队列 */
-uint32_t bsp_can1_tx_drop_count(void);
+uint32_t bsp_can1_tx_drop_count(void);   /* 发送失败(TIM6中断里查一次邮箱满即丢) */
 uint32_t bsp_can2_tx_drop_count(void);
+uint32_t bsp_can1_rx_drop_count(void);   /* 接收队列溢出丢弃 */
+uint32_t bsp_can2_rx_drop_count(void);
 
 #endif /* BSP_CAN_H */

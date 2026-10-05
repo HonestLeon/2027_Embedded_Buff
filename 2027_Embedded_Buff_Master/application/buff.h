@@ -31,6 +31,10 @@ typedef struct
 
 uint8_t buff_frame_pack(uint8_t out[8], const buff_frame_t *f);   /* 恒返回8 */
 bool   buff_frame_parse(const uint8_t in[8], buff_frame_t *f);   /* 校验包头0xaa */
+bool   buff_send_frame(const buff_frame_t *f);                   /* 打包 + CAN1(0x161) 发送 */
+
+/* P4 联调观察量(BUFF_P4_CAN_TEST 期间有效): 收到的从机帧累计数 */
+extern volatile uint32_t g_dbg_can1_rx_frames;
 
 /* ── 状态机 ── */
 void buff_init(void);

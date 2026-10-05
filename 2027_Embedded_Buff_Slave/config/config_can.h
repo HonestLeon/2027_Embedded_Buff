@@ -22,6 +22,13 @@
 #define CAN2_FILTER_ID_HIGH      ((0x200u)<<5)   /* CAN2 收 0x200~0x207(电机反馈0x201~204) */
 #define CAN2_FILTER_MASK_HIGH    ((0x7F8u)<<5)
 
+/* ── 接收队列深度(bsp_can.c 实现) ──
+ * CAN1: 从机帧 4Hz, 16 帧足够;
+ * CAN2: 电机反馈 1kHz×4 ID ≈ 4 帧/ms, 由 motor_update 每 1ms 排空, 32 帧留 8 倍裕量。
+ * 长度必须是 2 的幂(实现用位与取模), 改这里要同步改 bsp_can.c 的数组大小检查。 */
+#define CAN1_RX_QUEUE_LEN        16u
+#define CAN2_RX_QUEUE_LEN        32u
+
 /* ── 发送策略: 查一次空邮箱, 满即丢弃+计数, 零等待(策略在 bsp_can.c 实现) ──
  * 不能用 HAL_GetTick 做超时: 发送在 TIM6 中断里调, SysTick(优先级15)
  * 抢不进 TIM6(优先级2), 超时永远不到期。满即丢的语义:
