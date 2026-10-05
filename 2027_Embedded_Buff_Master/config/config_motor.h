@@ -19,4 +19,20 @@
 
 #define MOTOR_ENC_CPR       8192               /* 编码器一圈计数(老Zero_Check)  */
 
+/* ── 机构比例(老 main.h 原值) ── */
+#define MOTOR_CIRCLE_NUM    153.5f             /* 大符转一圈对应的电机圈数(老 CIRCLE_NUM)
+                                                  ⚠ 位置环的单位基准, 台架实测复核后再动 */
+#define MOTOR_RATO          3.0f               /* 齿轮比(老 RATO) */
+
+/* ── 反馈槽位: 0x201~0x204 ── */
+#define MOTOR_NUM           4u
+
+/* ── 电流帧(0x200)发送周期(ms) ──
+ * 老代码每个主循环都发(≈1ms); 控制环(位置/速度 PID + 过零)始终跑 1ms, 只有发帧受此限。
+ * ⚠ 总线容量核对: CAN2 当前 100kbps, 一帧 8 字节 ≈1.1ms —— 若 1ms 发一帧则
+ *   "发送本身"就占满总线(反馈帧还没算), 邮箱会常满、drop 计数持续增长(属"节流"而非故障)。
+ *   实测电机总线波特率/反馈频率后再定: 1Mbps 可保持 1ms; 100kbps 建议 2~5ms。
+ * 先保持 1ms 与老代码一致, 台架实测后回填。 */
+#define MOTOR_TX_PERIOD_MS  1u
+
 #endif /* CONFIG_MOTOR_H */

@@ -374,8 +374,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     {
       frame_div = 0;
       bsp_switch_poll();               /* 拨码采样(消抖) */
+      motor_set_run(bsp_switch_get().sw_run != 0u);    /* SW2 停/转 (P5) */
+      motor_set_mode(bsp_switch_get().sw_buff != 0u);  /* SW1 大/小符 (P5) */
       buff_step();                     /* TODO P6: CAN1出队+状态机 */
-      light_tick();                    /* 本地灯效(P3完成, 含SW_DEBUG白光测试) */
+      light_tick();                    /* 本地灯效(P3完成) */
     }
   }
 }
