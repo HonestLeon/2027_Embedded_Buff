@@ -288,14 +288,16 @@ static void on_hit(uint8_t panel)
     {
         go(BB_HIT_WINDOW);                  /* 首击 → 进入 1s 窗口 */
     }
-    else if (s_round >= (uint8_t)BUFF_PANEL_NUM)
+    else if (s_round >= (uint8_t)BUFF_SMALL_HIT_COUNT)
     {
-        send_all_on();                      /* 5 块全部打完 → 全亮 */
+        send_all_on();                      /* 全部打完 → 全亮 */
         go(BB_ALL_ON);
     }
     else
     {
-        send_cmd(BF_LIGHT, s_small[s_round], 0u, 0u);   /* 点亮下一块 */
+        /* 点亮下一块; 若 BUFF_SMALL_HIT_COUNT 设为 6(复刻老行为), 第 6 次会按取模
+           重新点亮已打过的灯板(老代码此处是越界读 num[5], 这里改成有定义的行为) */
+        send_cmd(BF_LIGHT, s_small[s_round % BUFF_RANDOM_ARRAY_LEN], 0u, 0u);
         s_round++;
         g_dbg_buff_round = s_round;
         go(BB_LIT);
