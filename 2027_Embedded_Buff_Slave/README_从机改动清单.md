@@ -173,7 +173,7 @@ static uint16_t *const s_ccr_tbl[WS2812_STRIP_NUM] = { s_ccr0, s_ccr1, ... };
 
 ---
 
-## 六、参考资料（上级目录 `2026_Embedded-Buff_new/`）
+## 六、参考资料（仓库 `docs/` 目录）
 
 | 文档 | 用途 |
 |---|---|
