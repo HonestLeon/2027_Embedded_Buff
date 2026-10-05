@@ -409,8 +409,10 @@ void buff_tick(float dt)
     switch (s_state)
     {
     case BB_LIT:
-        /* 老行为: 第一块不设计时; 从第二块起 2.5s 无击打 → 复位 */
-        if (s_round >= 2u && s_t_state >= ((float)BUFF_HIT_TIMEOUT_MS / 1000.0f))
+        /* BUFF_FIRST_HIT_TIMEOUT_EN=0(默认/老行为): 第一块不设计时, 从第二块起 2.5s 无击打复位
+           =1(按 2026 规则): 任何被点亮的装甲模块都受 2.5s 约束 */
+        if ((BUFF_FIRST_HIT_TIMEOUT_EN || s_round >= 2u) &&
+            s_t_state >= ((float)BUFF_HIT_TIMEOUT_MS / 1000.0f))
         {
             go(BB_RESET);
         }
