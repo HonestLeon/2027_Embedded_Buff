@@ -1,0 +1,14 @@
+# 文本文件统一规则：仓库内统一按 LF 存储，工作区检出为 CRLF（Windows 友好）
+# 目的：避免脚本/编辑器在 CRLF/LF 之间反复翻转，导致"整个文件都变了"的噪声 diff
+#
+# ⚠ 注意：只对明确的文本类型设置；二进制（.lib/.pdf/.png/.svg 等）不设规则，git 自动按二进制处理
+
+*.md       text eol=crlf
+*.txt      text eol=crlf
+*.c        text eol=crlf
+*.h        text eol=crlf
+*.s        text eol=crlf
+*.ioc      text eol=crlf
+*.uvprojx  text eol=crlf
+*.uvoptx   text eol=crlf
+*.mxproject text eol=crlf
