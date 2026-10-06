@@ -8,16 +8,14 @@
 
 ---
 
-## 步骤 0：改工程名（可选但推荐）
+## 步骤 0：工程名 —— ✅ 已定：不改名
 
-1. CubeMX 打开 `2027_Embedded_Buff_Slave/2027_Embedded_Buff_Master.ioc`；
-2. **Project Manager → Project → Project Name** 改成 `2027_Embedded_Buff_Slave`；
-3. `File → Save As` 保存为 `2027_Embedded_Buff_Slave.ioc`，删掉旧的 `..._Master.ioc`；
-4. 生成后删掉 `MDK-ARM/2027_Embedded_Buff_Master.*`（新的 `..._Slave.uvprojx` 会出现）。
+**结论（2026-10）**：`2027_Embedded_Buff_Slave/` 内部的 `.ioc` 与 Keil 工程名**保持 `2027_Embedded_Buff_Master` 不变**。
 
-> 嫌麻烦可以跳过（功能不受影响），但 Keil 工程名会一直叫 Master，容易混。
-> ⚠️ 改名会让 CubeMX 重新生成 MDK 工程，**Keil 里的 Groups/Include Paths 需要重配一次**：
-> `bsp`、`application` 两个 Group + `..\config;..\bsp;..\application` 三个包含路径。
+- 改名会触发 CubeMX 重生成 `MDK-ARM/`，需要重配 `bsp`/`application` 两个 Group 与
+  `..\config;..\bsp;..\application` 三个包含路径 —— 收益只是名字好看，代价是再来一次手工活；
+- 区分主从靠**目录名**（`_Slave`）和固件里的 `BOARD_ROLE_MASTER`，不靠 Keil 工程名；
+- 由此产生的"从机目录里有个叫 Master 的 .ioc"是**预期状态**，见《遗留待办》R3。
 
 ---
 
