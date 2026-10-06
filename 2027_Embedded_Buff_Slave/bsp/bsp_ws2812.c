@@ -12,8 +12,10 @@
  *       (已核对本工程 hal_tim.c 的 TIM_DMADelayPulseCplt); DMABurstState 与
  *       PWM Start_DMA 路径无关。
  *
- * 吞吐: 每 tick 最多启动 2 条(ISR 耗时保护); 最长一帧 262 灯≈8.2ms,
- *       6 条全刷 ≈ 13ms << 图案周期 250ms。
+ * 吞吐: 每 tick 最多启动 2 条(ISR 耗时保护); 最长一帧 320 灯≈9.7ms,
+ *       6 条依次启动全部刷完约 12ms << 图案周期 250ms。
+ * 与主机版的差异: ① 下面是 6 对缓冲(主机 1 对), 容量全部由 config 的 WS_LED_NUM_* 推导;
+ *                ② 用 s_desc 描述表展开(消除 -Wall 的缺省初始化警告)。驱动逻辑完全相同。
  */
 #include "bsp_ws2812.h"
 #include "tim.h"
@@ -21,21 +23,42 @@
 #include <string.h>
 
 /* ── 静态缓冲(主 SRAM! DMA 不能访问 CCM) ──────────────────────
- * 索引与 WS2812_STRIP_TBL 一一对应, 只给 led_num>0 的条目分配。
- * ⚠ 主机实接灯带只有"中心"一条(索引0); 新增实接灯带时必须
- *   同步改这里 + config_ws2812.h 的灯带表! */
-#define WS_CCR_LEN(led)  ((led) * 24u + WS2812_RESET_BITS)
-#define WS_RGB_LEN(led)  ((led) * 3u)
+ * 索引与 config_ws2812.h 的 WS2812_STRIP_TBL 一一对应。灯数只在 config 里用
+ * WS_LED_NUM_* 定义一次, 容量由它推导 → 不存在"改了灯带表忘了改缓冲"的越界。
+ * 灯数为 0 的通道仍留 1 颗占位(避免零长数组), init/refresh 会跳过它。
+ *
+ * RAM(老口径 881 颗): Σ(灯×24+90)×2B + Σ(灯×3) ≈ 45KB。
+ *   Keil 按 Target 对话框生成的 scatter 只有 RW_IRAM1(0x20000000,112KB) +
+ *   RW_IRAM2(0x2001C000,16KB), **CCM(0x10000000) 不在数据区** → 静态缓冲不可能
+ *   落到 DMA 访问不到的 CCM(此结论取自 2026 主机工程的 .sct)。 */
+#define WS_DUMMY_LED      1u                                /* 灯数=0 的通道占位 */
+#define WS_CCR_LEN(led)   (((led) ? (led) : WS_DUMMY_LED) * 24u + WS2812_RESET_BITS)
+#define WS_RGB_LEN(led)   (((led) ? (led) : WS_DUMMY_LED) * 3u)
 
-/* 主机只接 1 条(中心/PA6/88颗) → 单缓冲(≈4.4KB)。
-   接入新灯带时: CubeMX 加回通道/DMA 流 + 同步改 config_ws2812.h 灯带表与这里 */
-static uint16_t s_ccr0[WS_CCR_LEN(88u)];
-static uint8_t  s_rgb0[WS_RGB_LEN(88u)];
+static uint16_t s_ccr0[WS_CCR_LEN(WS_LED_NUM_UP)];          static uint8_t s_rgb0[WS_RGB_LEN(WS_LED_NUM_UP)];
+static uint16_t s_ccr1[WS_CCR_LEN(WS_LED_NUM_TARGET)];      static uint8_t s_rgb1[WS_RGB_LEN(WS_LED_NUM_TARGET)];
+static uint16_t s_ccr2[WS_CCR_LEN(WS_LED_NUM_ARM)];         static uint8_t s_rgb2[WS_RGB_LEN(WS_LED_NUM_ARM)];
+static uint16_t s_ccr3[WS_CCR_LEN(WS_LED_NUM_ARM_SIDE)];    static uint8_t s_rgb3[WS_RGB_LEN(WS_LED_NUM_ARM_SIDE)];
+static uint16_t s_ccr4[WS_CCR_LEN(WS_LED_NUM_DOWN)];        static uint8_t s_rgb4[WS_RGB_LEN(WS_LED_NUM_DOWN)];
+static uint16_t s_ccr5[WS_CCR_LEN(WS_LED_NUM_SPARE)];       static uint8_t s_rgb5[WS_RGB_LEN(WS_LED_NUM_SPARE)];
 
-static uint16_t *const s_ccr_tbl[WS2812_STRIP_NUM] = { s_ccr0 };
-static uint8_t *const s_rgb_tbl[WS2812_STRIP_NUM] = { s_rgb0 };
+static uint16_t *const s_ccr_tbl[WS2812_STRIP_NUM] =
+    { s_ccr0, s_ccr1, s_ccr2, s_ccr3, s_ccr4, s_ccr5 };
+static uint8_t *const s_rgb_tbl[WS2812_STRIP_NUM] =
+    { s_rgb0, s_rgb1, s_rgb2, s_rgb3, s_rgb4, s_rgb5 };
 
-static ws2812_strip_t s_strips[WS2812_STRIP_NUM] = WS2812_STRIP_TBL;
+/* config 的表每行只给 {句柄, 通道, 灯数} 三项 → 先落成 const 描述表, 由 init 展开成
+ * 运行期结构。直接用它初始化 s_strips 会让后面 5 个字段缺省, 触发
+ * -Wmissing-field-initializers(DoD 要求 -Wall 无警告)。 */
+typedef struct
+{
+    TIM_HandleTypeDef *tim;
+    uint32_t           channel;
+    uint16_t           led_num;
+} ws2812_desc_t;
+
+static const ws2812_desc_t s_desc[WS2812_STRIP_NUM] = WS2812_STRIP_TBL;
+static ws2812_strip_t      s_strips[WS2812_STRIP_NUM];
 
 /* "0"/"1" 码对应的 CCR 占空比计数值(老板实测时序) */
 static const uint16_t s_bit_ccr[2] = { WS2812_T0H_CCR, WS2812_T1H_CCR };
@@ -76,6 +99,9 @@ void bsp_ws2812_init(void)
     {
         ws2812_strip_t *s = &s_strips[i];
 
+        s->tim      = s_desc[i].tim;
+        s->channel  = s_desc[i].channel;
+        s->led_num  = s_desc[i].led_num;
         s->ccr_buf = s_ccr_tbl[i];
         s->rgb     = s_rgb_tbl[i];
         s->ch_idx  = (uint8_t)(1u << (s->channel >> 2));  /* 见文件头/配置清单 */

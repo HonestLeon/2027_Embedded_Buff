@@ -3,7 +3,7 @@
  * @brief 板卡角色 / 拨码开关 / 系统节拍 —— 2027 主机固件
  *
  * 规则: config 只放宏与 const 表; 本文件被任何层 include 都安全。
- * 拨码极性为"低电平有效=0"的旧代码假设, 上板万用表核对后回填!
+ * 拨码极性已实测(见下), 不再是"待核对"假设。
  */
 #ifndef CONFIG_BOARD_H
 #define CONFIG_BOARD_H

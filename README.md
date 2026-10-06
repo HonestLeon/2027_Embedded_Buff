@@ -18,7 +18,7 @@ STM32F405RGT6 + HAL，Keil MDK-ARM 工程，由 STM32CubeMX 6.15 生成。
 │   ├── application/                    # 业务层：motor / buff / light
 │   └── MDK-ARM/                        # Keil 工程（.uvprojx）
 │
-└── 2027_Embedded_Buff_Slave/           # ☆ 从机（打符灯板）：CubeMX 已就绪，代码待重构
+└── 2027_Embedded_Buff_Slave/           # ☆ 从机（打符灯板）：CubeMX ✅ + config 已从机化(S1)
     ├── README.md                       #   ← 从机入口页（改动要点 + 快速开始）
     ├── 2027_Embedded_Buff_Master.ioc   #   工程名沿用主机名(已定不改名，见《遗留待办》R3)
     ├── Core/ config/ bsp/ application/ #   与主机同构
@@ -46,7 +46,7 @@ STM32F405RGT6 + HAL，Keil MDK-ARM 工程，由 STM32CubeMX 6.15 生成。
 | P5 | `motor`（双环 PID + 大符正弦前馈） | ✅ 代码完成（圈时间未标定，见待办 M1） |
 | P6 | `buff` 大小符状态机 + 随机序列 | ✅ |
 | P7 | 整机联调与验收（与旧从机对接 ✅ / 电机圈时间标定 ⬜ / 上电色序专项 ⬜ / 烤机 ⬜） | 🟡 |
-| P8 | **从机重构**（见 `docs/从机代码重构计划.md`） | 🟡 CubeMX ✅ / 代码 S1~S7 ⬜ |
+| P8 | **从机重构**（见 `docs/从机代码重构计划.md`） | 🟡 CubeMX ✅ / 代码 S0~S1 ✅ / **S2 通道扫描 = 下一步** |
 
 ## 硬件要点速查（主机）
 

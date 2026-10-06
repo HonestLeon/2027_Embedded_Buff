@@ -31,7 +31,6 @@
 #include "bsp_switch.h"
 #include "bsp_can.h"
 #include "bsp_rng.h"
-#include "motor.h"
 #include "buff.h"
 #include "light.h"
 /* USER CODE END Includes */
@@ -112,7 +111,6 @@ int main(void)
   bsp_switch_init();
   bsp_can_init();
   srand(bsp_rng_get_seed());
-  motor_init();
   buff_init();
   light_init();
   HAL_TIM_Base_Start_IT(&htim6);    //中断调度开始

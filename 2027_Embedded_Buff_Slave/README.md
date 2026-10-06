@@ -17,23 +17,28 @@
 
 ## 快速开始
 
-1. Keil 打开 `MDK-ARM/*.uvprojx`，Rebuild（此刻仍是主机快照代码，能编过）；
-2. **第一步做通道扫描**：把 `config/config_board.h` 的 `DEBUG_TEST_MODE` 置 1 编译烧录，
-   Watch `g_dbg_ws_scan_idx`，逐条记录"索引 ↔ 物理灯带 ↔ 灯数"（详见《从机重构清单》S2）；
-3. 扫描完成后回填 `config/config_ws2812.h` 灯带表与灯数，再进入 S3~S6 的开发。
+**进度：S0 基线 ✅ / S1 config 从机化 ✅（2026-10-06）→ 下一步就是 S2 通道扫描。**
+
+1. Keil 打开 `MDK-ARM/*.uvprojx`，Rebuild 一次确认（语法/类型已用
+   `arm-none-eabi-gcc -fsyntax-only -Wall -Wextra` 验过：0 error 0 warning；链接与烧录仍需你在 Keil 里跑）；
+2. **S2 通道扫描**：`config/config_board.h` 已把 `TEST_TRIGGER_USE_SW2` 置 1 → **拨 SW2=ON 即进扫描**
+   （或把 `DEBUG_TEST_MODE` 置 1 编一个上电即扫描的调试固件）。Watch `g_dbg_ws_scan_idx`，
+   逐条记录"索引 ↔ 物理灯带 ↔ 灯数"（详见《从机重构清单》§六 ①）；
+3. 扫描结果**只回填一处**：`config/config_ws2812.h` 的 `WS_LED_NUM_*`（灯带表与 DMA 缓冲都由它推导），
+   再确认 S4~S6 要画在哪条灯带上（`config_light.h` 的 `SLV_STRIP_*`）。
 
 ## 从机代码改动要点（速查）
 
 | # | 文件 | 改动 |
 |---|---|---|
-| 1 | `config/config_board.h` | `BOARD_ROLE_MASTER` → **0**；新增 **`SLAVE_PANEL_NUM`**(1~5)，**每块板烧录前改这一处**（沿用老方式按板编译，固件文件名带板号） |
-| 2 | `config/config_ws2812.h` + `bsp/bsp_ws2812.c` | 灯带表 1 条 → **5~6 条** + 补回缓冲（881 灯 ≈43KB，**必须主 SRAM，不能用 CCM**） |
-| 3 | `config/config_motor.h`、`application/motor.c` | **删除**（从机无电机）；同时从 `main.c` 的 init、`it.c` 的调度、Keil Group 里去掉 |
-| 4 | `application/buff.c` | 保留协议段（`buff_frame_pack/parse`、`buff_send_frame`、`buff_slave_report_parse`）**逐字节不动**；把"主机构建专用"的状态机段换成从机状态机（`SLV_SLEEP/ARMED/ACTIVATED/ALL_ON`） |
-| 5 | `application/hit_detect.c/.h` | **新增**：EXTI 采集 + 环数查表 + `HD_ARMED/FIRED/LOCKED/MISHIT` 显式状态；**RDET9 环数必须实测核对** |
-| 6 | `application/light.c` | 换成灯板图案库（待激活+箭头流动 / 环数 / **中部灯臂进度 n/5（规则要求，老从机未实现）** / 全激活）；标定值继承 `config_light.h` |
-| 7 | `Core/Src/stm32f4xx_it.c` | 1ms 节拍里 **排空 CAN**（`bsp_can1_pop`）+ 灯带刷新；4Hz 帧跑状态机与图案。**禁止 `HAL_Delay` 阻塞** |
-| 8 | Keil | `application` Group 加 `hit_detect.c`、删 `motor.c`；包含路径不变 |
+| 1 | `config/config_board.h` | ✅ `BOARD_ROLE_MASTER=0`；新增 **`SLAVE_PANEL_NUM`**(1~5，越界 `#error`)，**每块板烧录前改这一处** + 固件文件名带板号；SW2 挪作白光扫描触发 |
+| 2 | `config/config_ws2812.h` + `bsp/bsp_ws2812.c` | ✅ 灯带表 1 条 → **6 条**，灯数单点定义 `WS_LED_NUM_*`（老口径 87/262/320/120/92/0，待 S2 实测）；缓冲随之开出，实测 `.bss` **45.1KB**/128KB（scatter 里没有 CCM，不用担心误放）；**灯数仍是要 S2 标定的标定值** |
+| 3 | `config/config_motor.h`、`application/motor.c/.h` | ✅ **已删**；`main.c` 的 init、`it.c` 的调度、Keil Group（`.uvprojx`/`.uvoptx`）均已去掉 |
+| 4 | `application/buff.c` | ⬜ 保留协议段（`buff_frame_pack/parse`、`buff_send_frame`、`buff_slave_report_parse`）**逐字节不动**；把"主机构建专用"的状态机段换成从机状态机（`SLV_SLEEP/ARMED/ACTIVATED/ALL_ON`） |
+| 5 | `application/hit_detect.c/.h` | ⬜ **新增**：EXTI 采集 + 环数查表 + `HD_ARMED/FIRED/LOCKED/MISHIT` 显式状态；**RDET9 环数必须实测核对** |
+| 6 | `application/light.c` | ⬜ 换成灯板图案库（待激活+箭头流动 / 环数 / **中部灯臂进度 n/5（规则要求，老从机未实现）** / 全激活）；标定值继承 `config_light.h` |
+| 7 | `Core/Src/stm32f4xx_it.c` | ⬜ 1ms 节拍里 **排空 CAN**（`bsp_can1_pop`）+ 灯带刷新；4Hz 帧跑状态机与图案。**禁止 `HAL_Delay` 阻塞**（当前仍是主机快照的调度内容，S3/S5 一并改） |
+| 8 | Keil | ⬜ 删 `motor.c` 已完成；S4 时 `application` Group 加 `hit_detect.c`；包含路径不变 |
 
 > 本表只是**入口速查**；逐条依据、改动理由与验收口径以《从机重构清单》§三/§五/§六为唯一出处，
 > 阶段划分与工期以《从机代码重构计划》为准。三处冲突时以后两者为准（本表随它们更新）。

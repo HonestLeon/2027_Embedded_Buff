@@ -25,7 +25,6 @@
 #include "config_board.h"
 #include "bsp_ws2812.h"
 #include "bsp_switch.h"
-#include "motor.h"
 #include "buff.h"
 #include "light.h"
 /* USER CODE END Includes */
@@ -440,7 +439,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     g_sched_tick_cnt++;
 
     /* ── 1ms 节拍 ───────────────────────────────── */
-    motor_update(0.001f);              /* TODO P5: 排空CAN2反馈+PID+0x200 */
     bsp_ws2812_refresh_all();          /* dirty灯带刷新(P2完成, 每tick≤2条) */
     buff_tick(0.001f);                 /* TODO P6: 2.5s/1s 超时计时 */
 
