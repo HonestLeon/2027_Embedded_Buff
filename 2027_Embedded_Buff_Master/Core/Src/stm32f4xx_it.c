@@ -361,23 +361,30 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim == &htim6)
   {
     static uint16_t frame_div = 0;
+    static uint16_t sw_div    = 0;   /* 拨码采样分频 */
 
     g_sched_tick_cnt++;
 
     /* ── 1ms 节拍 ───────────────────────────────── */
-    motor_update(0.001f);              /* TODO P5: 排空CAN2反馈+PID+0x200 */
-    bsp_ws2812_refresh_all();          /* dirty灯带刷新(P2完成, 每tick≤2条) */
-    buff_tick(0.001f);                 /* TODO P6: 2.5s/1s 超时计时 */
+    motor_update(0.001f);              /* 排空CAN2反馈 + 双环PID + 0x200 */
+    bsp_ws2812_refresh_all();          /* dirty灯带刷新(每tick≤2条) */
+    buff_tick(0.001f);                 /* 2.5s/1s/150ms 计时 */
+
+    /* ── 拨码: 20ms 采样(消抖 4 次≈80ms 生效), 反应速度接近老代码 ── */
+    if (++sw_div >= SWITCH_POLL_DIV)
+    {
+      sw_div = 0;
+      bsp_switch_poll();
+      motor_set_run(bsp_switch_get().sw_run != 0u);    /* SW2 停/转 */
+      motor_set_mode(bsp_switch_get().sw_buff != 0u);  /* SW1 大/小符 */
+    }
 
     /* ── 4Hz 逻辑帧 ─────────────────────────── */
     if (++frame_div >= SCHED_FRAME_DIV)
     {
       frame_div = 0;
-      bsp_switch_poll();               /* 拨码采样(消抖) */
-      motor_set_run(bsp_switch_get().sw_run != 0u);    /* SW2 停/转 (P5) */
-      motor_set_mode(bsp_switch_get().sw_buff != 0u);  /* SW1 大/小符 (P5) */
-      buff_step();                     /* TODO P6: CAN1出队+状态机 */
-      light_tick();                    /* 本地灯效(P3完成) */
+      buff_step();                     /* CAN1 出队 + 大小符状态机 */
+      light_tick();                    /* 本地灯效 + 红蓝切换 */
     }
   }
 }

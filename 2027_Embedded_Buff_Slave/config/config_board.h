@@ -21,15 +21,19 @@
 /* 注: 原理图上的 SW4(调试模式, PB5) 实物未装配, 旧代码也只定义了 SW[3]
    → 已从 CubeMX 删除该引脚(新板加开关时再加回即可) */
 
-#define SWITCH_DEBOUNCE_TICKS    4     /* 连续4次采样一致才生效(4Hz×4=无抖动) */
+/* ── 拨码采样 ──
+ * 老代码每个主循环(≈1ms)读一次; 新架构在 TIM6 1ms 中断里按 SWITCH_POLL_DIV 分频采样。
+ * 取 20ms: 机械抖动(<10ms)被滤掉, 同时响应够快(4 次一致 ≈80ms 生效)。
+ * ⚠ 早期版本挂在 4Hz 逻辑帧里 + 消抖 4 次 → 要 1 秒才生效, 太慢。 */
+#define SWITCH_POLL_DIV          20u   /* 采样周期 = 1ms × 20 = 20ms */
+#define SWITCH_DEBOUNCE_TICKS    4u    /* 连续 4 次(≈80ms)一致才生效 */
 
 /* ── 白光测试模式触发方式(仅 P3/P4 调试期) ──
- * 1 = 用 SW2(停/转) 触发   ← 当前设置: 电机代码尚未落地(P5), SW2 空闲
- *     实测: SW2 拨 ON(高电平) → 进白光扫描; OFF → 正常灯色
- * 0 = 用编译期宏 DEBUG_TEST_MODE
- * ⚠ P5 电机代码落地时必须改回 0, 把 SW2 还给"停/转"语义! */
-#define TEST_TRIGGER_USE_SW2     1
-#define DEBUG_TEST_MODE          0     /* =1 时无条件进入白光测试(配合 TEST_TRIGGER_USE_SW2=0) */
+ * 0 = 用编译期宏 DEBUG_TEST_MODE  ← 当前设置(P5 起): SW2 已归还"停/转"语义
+ * 1 = 用 SW2 触发(仅电机代码落地前的临时用法)
+ * 做灯带通道扫描时: 把 DEBUG_TEST_MODE 置 1, 编译烧录 → 上电即进扫描。 */
+#define TEST_TRIGGER_USE_SW2     0
+#define DEBUG_TEST_MODE          0     /* =1 时无条件进入白光测试(调试固件专用) */
 
 /* ── 系统节拍 ─────────────────────────────────────────────── */
 #define SCHED_TICK_MS            1     /* TIM6 中断周期(1ms), CubeMX: PSC=83/ARR=999 */
