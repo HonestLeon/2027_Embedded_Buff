@@ -40,11 +40,15 @@
 #define SLV_STRIP_UP          0u   /* 上(老 LED_ROAD_3, 87) */
 #define SLV_STRIP_DOWN        4u   /* 下(老 LED_ROAD_1, 92) */
 
-/* 亮度(老原值): 环数/待激活用满亮度, 进度条与"全激活"是很暗的 10 */
-#define SLV_LEVEL_FULL        255u /* 环数显示 / 待激活图案 */
-#define SLV_LEVEL_PROGRESS     10u /* 进度条灯带整条亮度(老值) */
-#define SLV_LEVEL_ALL_ON       10u /* 全激活亮度(老值, ⚠ 外观待与规则图 5-23 核对) */
-#define SLV_LEVEL_SLEEP         0u /* 休眠 = 全灭 */
+/* 亮度: 0 与 255 位序对称不受影响; 中间值要小心 ——
+ * ⚠⚠ **位序陷阱**: 2025 老驱动的位展开是低位先出(LSB-first), 与 WS2812 要求的高位先行相反,
+ *   所以老固件里的 10(0x0A) 打到灯珠上实际是 80(0x50): 老从机现场的进度条/全激活其实是
+ *   ≈80/255 的亮度。新驱动(bsp_ws2812.c)是正确的 MSB-first, 照搬"10"会暗 8 倍。
+ *   S6 上板按观感定值: 要复刻 2025 观感 → 填 80; 要按设计意图的暗 → 留 10。 */
+#define SLV_LEVEL_FULL        255u /* 环数显示 / 待激活图案(位序无关) */
+#define SLV_LEVEL_PROGRESS     10u /* 进度条亮度(老"设计值"; 老实际观感≈80) */
+#define SLV_LEVEL_ALL_ON       10u /* 全激活亮度(同上; ⚠ 外观还要与规则图 5-23 核对) */
+#define SLV_LEVEL_SLEEP         0u /* 休眠 = 全灭(位序无关) */
 
 /* 老"全激活"(state 4)只点亮 上/下 两条 —— S6.5 与规则图核对后再定要点几条 */
 #define SLV_ALL_ON_STRIP_MASK  ((1u<<SLV_STRIP_UP)|(1u<<SLV_STRIP_DOWN))
