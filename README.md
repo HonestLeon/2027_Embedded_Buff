@@ -18,8 +18,8 @@ STM32F405RGT6 + HAL，Keil MDK-ARM 工程，由 STM32CubeMX 6.15 生成。
 │   ├── application/                    # 业务层：motor / buff / light
 │   └── MDK-ARM/                        # Keil 工程（.uvprojx）
 │
-└── 2027_Embedded_Buff_Slave/           # ☆ 从机（打符灯板）：起手模板（尚未开发）
-    ├── README_从机改动清单.md          #   ← 从机开工先读这个
+└── 2027_Embedded_Buff_Slave/           # ☆ 从机（打符灯板）：CubeMX 已就绪，代码待重构
+    ├── README.md                       #   ← 从机入口页（改动要点 + 快速开始）
     ├── 2027_Embedded_Buff_Master.ioc   #   基于主机配置的快照，需按清单改
     ├── Core/ config/ bsp/ application/ #   与主机同构
     └── MDK-ARM/                        #   Drivers/ 未包含，CubeMX 生成时自动补齐
@@ -45,8 +45,8 @@ STM32F405RGT6 + HAL，Keil MDK-ARM 工程，由 STM32CubeMX 6.15 生成。
 | P4 | `bsp_can`（双总线过滤器+双队列+零等待发送）+ buff 协议 pack/parse | ⬜ |
 | P5 | `motor`（双环 PID + 大符正弦前馈） | ⬜ |
 | P6 | `buff` 大小符状态机 + 随机序列 | ⬜ |
-| P7 | 整机联调与验收（CAN1 模拟联调 ✅ / 与旧从机对接 ✅ / 电机圈时间标定 ⬜ / 烤机 ⬜） | 🟡 |
-| P8 | **从机重构**（见 `docs/从机代码重构计划.md`） | 🟡 CubeMX 已完成校验；待 S1~S7 |
+| P7 | 整机联调与验收（与旧从机对接 ✅ / 电机圈时间标定 ⬜ / 上电色序专项 ⬜ / 烤机 ⬜） | 🟡 |
+| P8 | **从机重构**（见 `docs/从机代码重构计划.md`） | 🟡 CubeMX ✅ / 代码 S1~S7 ⬜ |
 
 ## 硬件要点速查（主机）
 
@@ -82,6 +82,7 @@ STM32F405RGT6 + HAL，Keil MDK-ARM 工程，由 STM32CubeMX 6.15 生成。
 | [P3调试指南](docs/P3调试指南.md) | 灯带不亮的 debugger 排查流程（含 DMA 方向踩坑记录） |
 | [代码重构计划](docs/代码重构计划.md) | 分阶段实施计划、里程碑、验收标准 |
 | [大符思路](docs/大符思路.txt) | 2025 赛季需求与修改记录（原维护者手记） |
+| [遗留待办与开放问题](docs/遗留待办与开放问题.md) | **总览**：主机/从机/硬件三类待办 + 仓库事项（完成即销项） |
 | [从机代码重构计划](docs/从机代码重构计划.md) | **从机路线图**：阶段 S0~S7、里程碑、风险与 DoD、可复用资产清单 |
 | [从机重构清单](docs/从机重构清单.md) | 从机逐项明细：CubeMX 校验结论、逐文件改动、协议时序要求、与老从机差异、台架验收 |
 | [从机CubeMX操作说明](docs/从机CubeMX操作说明.md) | 从机 CubeMX 逐步操作（照着点）+ 每步校验命令 |
