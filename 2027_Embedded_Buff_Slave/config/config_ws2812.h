@@ -31,7 +31,6 @@
 #define WS_LED_NUM_ARM          320u  /* 索引2 TIM3_CH4/PB1  老 LED_ROAD_4 "灯臂"      */
 #define WS_LED_NUM_ARM_SIDE     120u  /* 索引3 TIM4_CH1/PB6  老 LED_ROAD_5 "侧灯臂"    */
 #define WS_LED_NUM_DOWN          92u  /* 索引4 TIM4_CH2/PB7  老 LED_ROAD_1 "下"        */
-#define WS_LED_NUM_DOWN          92u  /* 索引4 TIM4_CH2/PB7  老 LED_ROAD_1 "下"        */
 #define WS_LED_NUM_SPARE         90u  /* 索引5 TIM4_CH3/PB8  ⚠ 老从机从未驱动, 是否接线未知。
                                        *   这里**必须先给非 0 值**白光扫描才会去试它
                                        *   (light.c 只遍历 led_num>0 的通道, 填 0 就永远扫不到);

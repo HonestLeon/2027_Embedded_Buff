@@ -435,20 +435,27 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim == &htim6)
   {
     static uint16_t frame_div = 0;
+    static uint16_t sw_div    = 0;   /* 拨码采样分频 */
 
     g_sched_tick_cnt++;
 
     /* ── 1ms 节拍 ───────────────────────────────── */
-    bsp_ws2812_refresh_all();          /* dirty灯带刷新(P2完成, 每tick≤2条) */
-    buff_tick(0.001f);                 /* TODO P6: 2.5s/1s 超时计时 */
+    bsp_ws2812_refresh_all();          /* dirty灯带刷新(每tick≤2条) */
+    buff_tick(0.001f);                 /* 状态机计时(从机版 S5 落地) */
+
+    /* ── 拨码: 20ms 采样(消抖 4 次≈80ms 生效); 从机无电机, SW2 兼作白光扫描触发 ── */
+    if (++sw_div >= SWITCH_POLL_DIV)
+    {
+      sw_div = 0;
+      bsp_switch_poll();
+    }
 
     /* ── 4Hz 逻辑帧 ─────────────────────────── */
     if (++frame_div >= SCHED_FRAME_DIV)
     {
       frame_div = 0;
-      bsp_switch_poll();               /* 拨码采样(消抖) */
-      buff_step();                     /* TODO P6: CAN1出队+状态机 */
-      light_tick();                    /* 本地灯效(P3完成, 含SW_DEBUG白光测试) */
+      buff_step();                     /* S5: CAN 出队 + 从机状态机(CAN 排空届时移到 1ms) */
+      light_tick();                    /* 灯效 + SW2 触发通道扫描 */
     }
   }
 }

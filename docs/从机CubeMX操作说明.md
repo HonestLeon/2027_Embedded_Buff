@@ -28,12 +28,18 @@
 
 | 引脚 | GPIO mode | GPIO Pull-up/Pull-down | User Label | 触发沿 |
 |---|---|---|---|---|
-| PA1~PA5 | External Interrupt Mode with **Rising/Falling** edge trigger | **No pull-up and no pull-down** | `KEY1`~`KEY5` | 双边沿 |
-| PC6~PC10 | 同上 | **No pull-up and no pull-down** | `KEY6`~`KEY10` | 双边沿 |
+| PA1~PA5 | External Interrupt Mode with **Falling** edge trigger | **No pull-up and no pull-down** | `KEY1`~`KEY5` | **下降沿** |
+| PC6~PC10 | 同上 | **No pull-up and no pull-down** | `KEY6`~`KEY10` | **下降沿** |
 
 > - **不要配内部上拉**：硬件已有 1kΩ 串阻 + 10kΩ 上拉 + 10µF RC 消抖（原理图第 3 页）。
 > - User Label 必须填 `KEY1`~`KEY10`（代码里要用 `KEY1_Pin`/`KEY1_GPIO_Port`）。
-> - 触发沿先配**双边沿**，上板实测极性后再收敛到单边沿（减少无效中断）。
+> - **触发沿必须是下降沿（`GPIO_MODE_IT_FALLING`）** —— 依据 2025 老从机固件（`gpio.c` 里
+>   10 路全是 `GPIO_MODE_IT_FALLING` + `NOPULL`，整季验证过）。
+>   ⚠️ **曾错误配成双边沿**：一次击打会产生 2 个沿（击打 + 回弹），第二个沿在"已击发"状态下到达，
+>   会被判成"打错"→ 上报 `[2]=0x01` → **主机整轮复位**。
+>   **本项已于验收时直接改好**（`.ioc` 的 10 处 `GPIO_ModeDefaultEXTI` + `gpio.c` 两处，保持
+>   重新生成一致）；S4 实现击打判定时仍建议**再加一道软件窗口**（`HD_IGNORE_MS` 50~100ms，
+>   忽略同一引脚在窗口内的后续沿）作为二道防线。
 
 **③ System Core → NVIC**：使能（抢占优先级填 **3**）
 
