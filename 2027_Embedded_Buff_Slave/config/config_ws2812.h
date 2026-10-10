@@ -25,17 +25,20 @@
  *   **以实测为准, 不要相信丝印**。
  *
  * 灯数只在下面 WS_LED_NUM_* 一处定义: 灯带表与 bsp_ws2812.c 的 DMA 缓冲都由它推导,
- * 不会出现"改了表忘了改缓冲"的越界。索引 5(PB8) 老从机从未驱动 → 填 0 待核实。 */
+ * 不会出现"改了表忘了改缓冲"的越界。
+ *
+ * ⚠ 硬件与 2025 完全相同 ⇒ 下表灯数与功能映射**直接继承老从机口径**(老代码 DMA 绑定即映射依据),
+ *   无需标定; 各条灯带若需单独点亮核实, 用 DEBUG_TEST_MODE=1 编调试固件(见《从机灯带自检与排障》)。
+ *   索引 5(PB8) 老从机从未驱动 → 按老行为填 0(不分配/不发送)。 */
 #define WS_LED_NUM_UP            87u  /* 索引0 TIM3_CH1/PA6  老 LED_ROAD_3 "上"        */
 #define WS_LED_NUM_TARGET       262u  /* 索引1 TIM3_CH2/PA7  老 LED_ROAD_2 "中"(靶面)  */
 #define WS_LED_NUM_ARM          320u  /* 索引2 TIM3_CH4/PB1  老 LED_ROAD_4 "灯臂"      */
 #define WS_LED_NUM_ARM_SIDE     120u  /* 索引3 TIM4_CH1/PB6  老 LED_ROAD_5 "侧灯臂"    */
 #define WS_LED_NUM_DOWN          92u  /* 索引4 TIM4_CH2/PB7  老 LED_ROAD_1 "下"        */
-#define WS_LED_NUM_SPARE         90u  /* 索引5 TIM4_CH3/PB8  ⚠ 老从机从未驱动, 是否接线未知。
-                                       *   这里**必须先给非 0 值**白光扫描才会去试它
-                                       *   (light.c 只遍历 led_num>0 的通道, 填 0 就永远扫不到);
-                                       *   S2 实测: 不亮 → 改回 0(不分配/不发送); 亮 → 改成实测灯数。
-                                       *   90 是个安全的试探值: 多发的部分只是没接的灯珠, 无害。 */
+#define WS_LED_NUM_SPARE          0u  /* 索引5 TIM4_CH3/PB8 —— 老从机从未驱动该口, 按老行为不驱动。
+                                       *   硬件与 2025 相同 ⇒ 老固件行为即规格, 无需实测;
+                                       *   填 0 = 不分配缓冲/不发送(省 ~4.4KB)。
+                                       *   ⚠ 若将来确认该口接了灯带: 改成实测灯数即可(表与缓冲自动跟随)。 */
 
 #define WS2812_STRIP_TBL { \
     { &htim3, TIM_CHANNEL_1, WS_LED_NUM_UP },       \

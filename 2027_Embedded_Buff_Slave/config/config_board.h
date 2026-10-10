@@ -29,8 +29,14 @@
  * 因此 ACTIVE_LEVEL = 1, 且语义与旧固件一致:
  *   高电平 = 转动 / 蓝色 / 大符  (旧代码: test_flag=SW[0]、低=红、BUFF_TYPE=SW[1]) */
 #define SW_BUFF_ACTIVE_LEVEL     1     /* SW1 大/小符 PD2: 高=大符, 低=小符 */
-#define SW_RUN_ACTIVE_LEVEL      1     /* SW2 停/转  PB3: 主机用; **从机无电机** → 挪作白光测试触发 */
+#define SW_RUN_ACTIVE_LEVEL      1     /* SW2 停/转  PB3: 主机用(从机无电机) */
 #define SW_COLOR_ACTIVE_LEVEL    1     /* SW3 红/蓝  PB4: 高=蓝, 低=红(与旧代码一致) */
+
+/* ⚠⚠【从机构建】本板**未接拨码开关**(实测): PD2/PB3/PB4 悬空 + 内部上拉 →
+ *   三个 SW_* 恒为"高" = 恒为"激活"值。因此从机构建里:
+ *   ① 绝不能用本机拨码做逻辑判断(颜色/大小符一律取 CAN 帧的 [4]/[2]);
+ *   ② 更不能拿 SW2 当自检触发 → 会一上电就永久扫描(TEST_TRIGGER_USE_SW2 已置 0);
+ *   ③ 灯带自检只能用编译期宏 DEBUG_TEST_MODE=1 编调试固件(上电即扫)。 */
 /* 注: 原理图上的 SW4(调试模式, PB5) 实物未装配, 旧代码也只定义了 SW[3]
    → 已从 CubeMX 删除该引脚(新板加开关时再加回即可) */
 
@@ -45,8 +51,8 @@
  * 从机没有电机, SW2(停/转)空着 → 默认用 SW2 触发, 一块板扫 6 条灯带不用反复编译。
  * 0 = 只认编译期宏 DEBUG_TEST_MODE;  1 = 用 SW2(ON=进扫描) 触发
  * S2 也可把 DEBUG_TEST_MODE 置 1 编一个"上电即扫描"的调试固件。 */
-#define TEST_TRIGGER_USE_SW2     1
-#define DEBUG_TEST_MODE          0     /* =1 时无条件进入白光测试(调试固件专用) */
+#define TEST_TRIGGER_USE_SW2     0
+#define DEBUG_TEST_MODE          0     /* =1 时无条件进入灯带自检(调试固件专用) */
 
 /* ── 系统节拍 ─────────────────────────────────────────────── */
 #define SCHED_TICK_MS            1     /* TIM6 中断周期(1ms), CubeMX: PSC=83/ARR=999 */
