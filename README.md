@@ -46,7 +46,7 @@ STM32F405RGT6 + HAL，Keil MDK-ARM 工程，由 STM32CubeMX 6.15 生成。
 | P5 | `motor`（双环 PID + 大符正弦前馈） | ✅ 代码完成（圈时间未标定，见待办 M1） |
 | P6 | `buff` 大小符状态机 + 随机序列 | ✅ |
 | P7 | 整机联调与验收（与旧从机对接 ✅ / 电机圈时间标定 ⬜ / 上电色序专项 ⬜ / 烤机 ⬜） | 🟡 |
-| P8 | **从机重构**（见 `docs/从机代码重构计划.md`） | 🟡 S0~S2 ✅ / S3 代码 ✅ / **S4~S6 连续编码**，台架统一在 S7 |
+| P8 | **从机重构**（见 `docs/从机代码重构计划.md`） | 🟡 S0~S3 ✅ / **S4~S6 代码 ✅（2026-10-10）**，台架统一在 S7，进度条 n/5 归 S8 专项 |
 
 ## 硬件要点速查（主机）
 
@@ -68,7 +68,10 @@ STM32F405RGT6 + HAL，Keil MDK-ARM 工程，由 STM32CubeMX 6.15 生成。
 | `g_dbg_ws_scan_idx` | `application/light.c` | 灯带通道扫描：`DEBUG_TEST_MODE=1` 时该值 = 当前点亮灯带的索引（0xFF=未扫描） |
 | `g_dbg_buff_state` / `g_dbg_buff_round` | `application/buff.c` | 大小符状态机状态与轮次（对照转换表看流程） |
 | `g_dbg_can1_rx_frames` | `application/buff.c` | 收到的从机回报帧累计数 |
-| `g_buff_rx`（从机） | `application/buff.c` | 从机收帧快照：`frames`/`bad_frames`/`seq`/`cmd`/`round`/`age_ms`/`max_burst` —— **S7 组 1 的主判据** |
+| `g_buff_rx`（从机） | `application/buff.c` | 从机收帧快照：`frames`/`bad_frames`/`seq`/`cmd`/`round`/`age_ms`/`max_burst` + `my_ev_*` 本机事件锁存 —— **S7 组 1 的主判据** |
+| `g_dbg_slv`（从机） | `application/buff.c` | 从机状态机快照：`state`/`circle`/`ev_cnt`/`hit_ev`/`mishit_ev`/`report_hit`/`report_mishit` —— **S7 组 3 主判据** |
+| `g_dbg_hit`（从机） | `application/hit_detect.c` | 击打快照：`fire_cnt`/`mishit_cnt`/`ignored`/`stray`/`last_pin`/`last_circle`/`age_ms` —— **S7 组 2 主判据（重点核对 RDET9 几环）** |
+| `g_dbg_pat`（从机） | `application/light.c` | 图案库快照：`scene`/`circle`/`phase`/`phase_div`/`test`（白光扫描索引仍叫 `g_dbg_ws_scan_idx`）—— **S7 组 4 主判据** |
 | `g_dbg_motor` | `application/motor.c` | 电机环快照：`fb_frames`(反馈帧累计, 判断速度环是否闭环)、`fb_speed`/`fb_angle`、`target`/`position`/`delat`、`cmd_current` |
 
 ## 文档（`docs/`）
@@ -84,7 +87,7 @@ STM32F405RGT6 + HAL，Keil MDK-ARM 工程，由 STM32CubeMX 6.15 生成。
 | [代码重构计划](docs/代码重构计划.md) | 主机 P0~P6 分阶段实施记录（**已全部完成，留档**；未做完的在《遗留待办》§一） |
 | [大符思路](docs/大符思路.txt) | 2025 赛季需求与修改记录（原维护者手记） |
 | [遗留待办与开放问题](docs/遗留待办与开放问题.md) | **总览**：主机/从机/硬件三类待办 + 仓库事项（完成即销项） |
-| [从机代码重构计划](docs/从机代码重构计划.md) | **从机路线图**：阶段 S0~S7、里程碑、风险与 DoD、可复用资产清单（做什么/按什么顺序） |
+| [从机代码重构计划](docs/从机代码重构计划.md) | **从机路线图**：阶段 S0~S8、里程碑、风险与 DoD、可复用资产清单（做什么/按什么顺序） |
 | [从机重构清单](docs/从机重构清单.md) | **从机唯一明细出处**：逐文件改动(§三)、协议时序(§四)、与老从机差异(§五)、逐项验收 ①~⑭(§六)、协议速查(§七) |
 | [从机CubeMX操作说明](docs/从机CubeMX操作说明.md) | 从机 CubeMX 逐步操作（照着点）+ 每步校验命令（**✅ 已完成并校验，留档**） |
 | [从机灯带自检与排障](docs/从机灯带自检与排障.md) | 可选排障工具：逐条点亮定位"某条灯带不亮/段位不对"（**从机未接拨码，只能用 `DEBUG_TEST_MODE` 宏触发**）|

@@ -70,6 +70,14 @@ typedef struct
     volatile uint8_t  round;        /* [6] 已激活组数 0~5(进度条 n/5 用) */
     volatile uint16_t age_ms;       /* 距最近一有效帧多少 ms */
     volatile uint8_t  max_burst;    /* 单次 poll 排空到的最大帧数(主机全亮连发 5 帧属正常) */
+    /* ── S5: 本机事件锁存(逐帧判"与我有关", 不能只靠上面的 cmd 镜像) ──
+     * cmd 只保留"最后一条有效帧": 4Hz 窗口内别人的帧后到, 会吃掉发给本机的熄灭帧
+     * —— 等于把老单缓冲覆盖缺陷搬进业务层。所以收帧当场按老 Decode 的匹配规则锁存:
+     *   0x01/0x02 必须 [3]或[5]==本机板号; 0x03/0x04 广播不看板号。
+     * 1ms 的 buff_tick() 消费 my_ev_valid 做状态转换(150ms 熄灯对不能塌进 4Hz 窗)。 */
+    volatile uint8_t  my_ev_cmd;    /* 最近一条"与本板有关"的命令 */
+    volatile uint8_t  my_ev_valid;  /* 1=有未消费事件 */
+    volatile uint32_t my_ev_seq;    /* 每条命中/广播帧 +1(观测用) */
 } buff_rx_t;
 
 extern volatile buff_rx_t g_buff_rx;
@@ -83,7 +91,7 @@ extern volatile uint32_t g_dbg_can1_rx_frames;   /* 收到的从机帧累计数 
 extern volatile uint8_t  g_dbg_buff_state;       /* 状态机当前状态 */
 extern volatile uint8_t  g_dbg_buff_round;       /* 当前轮次 */
 
-/* ── 大小符状态机(与《代码架构设计》3.3 转换表一致) ── */
+/* ── 大小符状态机(主机; 与《代码架构设计》3.3 转换表一致) ── */
 typedef enum
 {
     BB_RESET = 0,       /* 复位: 重取随机序列 + 发全复位帧(从机回休眠) */
@@ -94,9 +102,18 @@ typedef enum
     BB_ALL_ON,          /* 全亮展示, 2.5s 后复位 */
 } bb_state_t;
 
+/* ── 从机状态机状态(S5; 与四种外观一一对应, light.h 的渲染场景用它) ── */
+typedef enum
+{
+    SLV_SLEEP = 0,      /* 休眠: 5 条全灭; 老 state 1(0x01/0x03 进入, 重新武装击打) */
+    SLV_ARMED,          /* 待激活: 靶面图案+箭头流动; 老 state 2(0x02 进入, 唯一允许被击中) */
+    SLV_ACTIVATED,      /* 已激活: 环数显示+灯臂两条整条常亮(复刻口径, n/5 归 S8); 被击中进入并上报一次 */
+    SLV_ALL_ON,         /* 全激活: 上/下两条点亮; 老 state 4(0x04 广播进入) */
+} slv_state_t;
+
 /* ── 状态机 ── */
 void buff_init(void);
-void buff_step(void);           /* 4Hz: 主机=排空+状态机+发帧; 从机=消费 g_buff_rx(S5) */
-void buff_tick(float dt);       /* 1ms: 2.5s超时 / 1s窗口 计时 */
+void buff_step(void);           /* 4Hz: 主机=排空+状态机+发帧; 从机=击打事件+上报+颜色刷新(S5) */
+void buff_tick(float dt);       /* 1ms: 主机=2.5s/1s 计时; 从机=消费 my_ev 状态转换(S5) */
 
 #endif /* BUFF_H */

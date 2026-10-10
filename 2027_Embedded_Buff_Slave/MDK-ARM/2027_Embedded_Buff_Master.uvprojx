@@ -548,6 +548,11 @@
               <FileType>1</FileType>
               <FilePath>..\application\light.c</FilePath>
             </File>
+            <File>
+              <FileName>hit_detect.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\application\hit_detect.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -33,6 +33,7 @@
 #include "bsp_rng.h"
 #include "buff.h"
 #include "light.h"
+#include "hit_detect.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -113,6 +114,7 @@ int main(void)
   srand(bsp_rng_get_seed());
   buff_init();
   light_init();
+  hit_detect_init();          /* S4: EXTI 击打记录(EXTI 已在 MX_GPIO_Init 使能, 回调只记录) */
   HAL_TIM_Base_Start_IT(&htim6);    //中断调度开始
   /* USER CODE END 2 */
 

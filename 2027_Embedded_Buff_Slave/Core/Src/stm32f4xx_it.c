@@ -27,6 +27,7 @@
 #include "bsp_switch.h"
 #include "buff.h"
 #include "light.h"
+#include "hit_detect.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -455,7 +456,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if (++frame_div >= SCHED_FRAME_DIV)
     {
       frame_div = 0;
-      buff_step();                     /* S5: 消费 g_buff_rx → 从机状态机(排空已在 1ms 做完) */
+      hit_detect_task();               /* S4: 排空 EXTI 记录环 → 环数判定 → 事件 */
+      buff_step();                     /* S5: 消费 g_buff_rx + 击打事件 → 从机状态机(排空已在 1ms 做完) */
       light_tick();                    /* 灯效/灯带自检(从机只能用 DEBUG_TEST_MODE 触发) */
     }
   }

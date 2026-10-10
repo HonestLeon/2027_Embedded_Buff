@@ -27,7 +27,11 @@
 #include "config_can.h"
 #include "bsp_can.h"
 #include "bsp_switch.h"
-#include "config_board.h"   /* BOARD_ROLE_MASTER: 状态机段按角色编译 */
+#include "config_board.h"   /* BOARD_ROLE_MASTER / SLAVE_PANEL_NUM: 状态机段按角色编译 */
+#if !BOARD_ROLE_MASTER
+#include "light.h"          /* 场景渲染(S6 图案库) */
+#include "hit_detect.h"     /* 击打事件(S4) */
+#endif
 
 /* ── 协议字节位置 ─────────────────────────────────────────── */
 #define BF_HEAD                      0xAAu   /* 包头 */
@@ -223,6 +227,29 @@ void buff_can_rx_poll(void)
             g_buff_rx.frames++;
             g_buff_rx.seq++;
             burst++;
+
+            /* S5: 逐帧锁存"与本板有关"的命令(老 Decode 的匹配规则:
+               0x03/0x04 广播不看板号; 0x01/0x02 必须 [3]或[5]==SLAVE_PANEL_NUM)。
+               必须在这里(1ms、逐帧)做, 不能等 4Hz 看 cmd 镜像 —— 同一逻辑帧窗口内
+               别人的帧后到就会吃掉发给本板的熄灭帧(老单缓冲缺陷的翻版)。 */
+            {
+                uint8_t ev = 0u;
+                if (f.cmd == BF_RESET || f.cmd == BF_ALL_ON)
+                {
+                    ev = (uint8_t)f.cmd;
+                }
+                else if (f.panel_a == (uint8_t)SLAVE_PANEL_NUM ||
+                         f.panel_b == (uint8_t)SLAVE_PANEL_NUM)
+                {
+                    ev = (uint8_t)f.cmd;
+                }
+                if (ev != 0u)
+                {
+                    g_buff_rx.my_ev_cmd  = ev;      /* 同窗多条: 后到覆盖 = 老代码"最后写入者赢" */
+                    g_buff_rx.my_ev_valid = 1u;
+                    g_buff_rx.my_ev_seq++;
+                }
+            }
         }
         else
         {
@@ -509,20 +536,146 @@ void buff_tick(float dt)
     }
 }
 
-#else   /* ── 从机构建: S3~S4 过渡期, 只收不发, 业务等 S5 ── */
+#else   /* ════════════════════ 从机状态机(S5) ════════════════════
+ * 对照老从机 main.c + Decode():
+ *   老 state 1/2/3/4          → SLV_SLEEP / SLV_ARMED / SLV_ACTIVATED / SLV_ALL_ON
+ *   老 Decode() 板号匹配/广播  → buff_can_rx_poll() 已逐帧(1ms)锁存 my_ev, 本段只管消费
+ *   老 "中断当场改状态"        → hit_detect 4Hz 事件 + 本段消费
+ *   老 once(0/1/2)+start 锁存  → hit_detect 的 armed/fired + HD_IGNORE_MS
+ * 有意修正(《从机重构清单》差异表):
+ *   #8  上报帧四字节每次全写(不依赖上一帧 [1]/[3] 残留);
+ *   #12 状态转换统一清屏(老 state4 不更新 last_state → 4→2 会残留环数图案)。
+ * 时序纪律(《从机代码重构计划》S5 设计决定表):
+ *   帧触发的转换在 1ms buff_tick() 消费锁存即时换态 —— 主机熄灭→点亮只隔 150ms,
+ *   若等 4Hz 窗口, "先熄后亮"会塌缩成"只见点亮"(老单缓冲缺陷的另一半);
+ *   击打事件消费与上报放 4Hz = 老主循环 ≈200ms 节拍, 不比老代码慢。 */
+
+static slv_state_t s_slv = SLV_SLEEP;   /* 上电即休眠(老代码 state=1) */
+static uint8_t     s_circle;            /* 本次 ACTIVATED 的环数(0=无) */
+
+/* ── 调试快照(长期保留, Watch g_dbg_slv; S7 组 3 主判据) ─────
+ *   state           : 0 休眠 / 1 待激活 / 2 已激活 / 3 全激活
+ *   ev_cmd/ev_cnt   : 1ms 消费的"与本板有关"命令与次数(收帧触发的动作)
+ *   hit_ev/mishit_ev: 4Hz 消费的击打事件; report_hit/report_mishit: 已发 0x160 帧数
+ *     ⚠ 进入 ACTIVATED 那拍 report_hit 恰好 +1; 再打只涨 mishit_ev(不重复报)
+ *   is_big/is_blue/round: [2]/[4]/[6] 镜像 —— round 当前只观测, 画 n/5 归 S8 */
+volatile struct
+{
+    uint8_t  state;
+    uint8_t  circle;
+    uint8_t  ev_cmd;
+    uint8_t  armed;
+    uint32_t ev_cnt;
+    uint32_t hit_ev;
+    uint32_t mishit_ev;
+    uint32_t report_hit;
+    uint32_t report_mishit;
+    uint8_t  is_big;
+    uint8_t  is_blue;
+    uint8_t  round;
+} g_dbg_slv;
+
+/* 上行 0x160 回报: 四字节全写(差异表 #8)。击中 [1]=0x03 / 打错 [2]=0x01,
+ * 主机侧"复位优先"判定(与 buff_slave_report_parse 兼容)。 */
+static void slv_report(bool mishit)
+{
+    uint8_t raw[8] = {0u};
+
+    raw[BF_IDX_HEAD]       = BF_HEAD;
+    raw[BF_RPT_HIT_BYTE]   = mishit ? 0x00u : BF_RPT_HIT_VALUE;
+    raw[BF_RPT_RESET_BYTE] = mishit ? BF_RPT_RESET_VALUE : 0x00u;
+    raw[BF_IDX_PANEL_A]    = (uint8_t)SLAVE_PANEL_NUM;
+    if (bsp_can1_send(CAN_ID_SLAVE_TO_MASTER, raw))
+    {
+        if (mishit) { g_dbg_slv.report_mishit++; }
+        else        { g_dbg_slv.report_hit++; }
+    }
+}
+
+/* 状态转换唯一入口: 击打武装 + 场景切换(light_set_scene 是唯一清屏点)。
+ * 只有"被击中"这一条路进 ACTIVATED(见 buff_step) → 上报天然只发一次。 */
+static void slv_enter(slv_state_t st)
+{
+    s_slv = st;
+    hit_detect_set_armed(st == SLV_ARMED);   /* 仅待激活允许被击中(老 once&&state==2 语义) */
+    light_set_scene(st, s_circle);
+    g_dbg_slv.state = (uint8_t)st;
+    g_dbg_slv.armed = (st == SLV_ARMED) ? 1u : 0u;
+}
+
 void buff_init(void)
 {
-    /* S5: 从机状态机初始化(进 SLV_SLEEP、清击打武装) */
+    s_slv    = SLV_SLEEP;
+    s_circle = 0u;
+    hit_detect_set_armed(false);
+    g_dbg_slv.state = (uint8_t)s_slv;
+    /* 灯带缓冲上电全 0 = 熄灭, 不重复清屏(light_init 在本函数之后才跑) */
 }
 
-void buff_step(void)
-{
-    /* S5: 消费 g_buff_rx(seq 变化 = 有新事件) → 从机状态机 + 灯效 + 上报 0x160
-       此处刻意不排空 CAN1: 排空在 1ms 的 buff_can_rx_poll() 里做。 */
-}
-
+/* 1ms: 消费"与本板有关"命令锁存 → 状态转换。
+ * 已处于目标态再收同命令 = no-op(老 Decode 对 state 赋同值不触发清屏/重新武装)。 */
 void buff_tick(float dt)
 {
-    (void)dt;     /* S5: 打错/激活计时等 1ms 级事务放这里 */
+    slv_state_t tgt;
+    uint8_t     cmd;
+
+    (void)dt;
+    if (g_buff_rx.my_ev_valid == 0u)
+    {
+        return;
+    }
+    cmd = g_buff_rx.my_ev_cmd;
+    g_buff_rx.my_ev_valid = 0u;
+    g_dbg_slv.ev_cmd = cmd;
+    g_dbg_slv.ev_cnt++;
+
+    if (cmd == (uint8_t)BF_LIGHT)
+    {
+        tgt = SLV_ARMED;
+    }
+    else if (cmd == (uint8_t)BF_ALL_ON)
+    {
+        tgt = SLV_ALL_ON;
+    }
+    else                                     /* BF_EXTINGUISH / BF_RESET: 一律回休眠 */
+    {
+        tgt = SLV_SLEEP;
+        s_circle = 0u;
+    }
+    if (tgt != s_slv)
+    {
+        slv_enter(tgt);
+    }
+}
+
+/* 4Hz: 消费击打事件 → 上报 + 状态抬升; 颜色按帧更新(老 Decode 对任何 0xAA 帧都刷
+ * color_type、图案每圈重画时读取 —— 差异表 #11 的"对所有板生效"语义)。 */
+void buff_step(void)
+{
+    uint8_t    circle;
+    uint16_t   pin;
+    hd_event_t ev;
+
+    light_set_color(g_buff_rx.is_blue != 0u);
+    g_dbg_slv.is_big  = g_buff_rx.is_big;
+    g_dbg_slv.is_blue = g_buff_rx.is_blue;
+    g_dbg_slv.round   = g_buff_rx.round;
+
+    ev = hit_detect_take(&circle, &pin);
+    if (ev == HD_EV_HIT)
+    {
+        s_circle = circle;
+        slv_enter(SLV_ACTIVATED);   /* 唯一进入路径 → 进态上报恰好一次(老 state3 入口同) */
+        slv_report(false);
+        g_dbg_slv.circle  = circle;
+        g_dbg_slv.hit_ev++;
+    }
+    else if (ev == HD_EV_MISHIT)
+    {
+        g_dbg_slv.mishit_ev++;
+        slv_report(true);           /* 老顺序: 先发复位帧(once==2 分支), 再回休眠 */
+        s_circle = 0u;
+        slv_enter(SLV_SLEEP);
+    }
 }
 #endif /* BOARD_ROLE_MASTER */

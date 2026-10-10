@@ -203,4 +203,4 @@ grep -c "define KEY[0-9]*_Pin" Core/Inc/main.h      # 期望: 10
 
 之后我会写：`application/hit_detect.c`（EXTI 采集 + 环数查表 + armed/fired/locked/mishit）、
 `application/buff.c` 的从机状态机（替换主机构建专用段）、`application/light.c` 的灯板图案库
-（待激活/箭头流动/环数/进度 n/5/全激活）、以及 `config_ws2812.h` 的多灯带表 + 缓冲。
+（待激活/箭头流动/环数/全激活——纯复刻老口径；进度 n/5 移 S8 专项）、以及 `config_ws2812.h` 的多灯带表 + 缓冲。
