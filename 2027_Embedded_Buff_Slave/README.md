@@ -24,7 +24,8 @@
    `arm-none-eabi-gcc -fsyntax-only -Wall -Wextra` 验过：0 error 0 warning；链接与烧录仍需你在 Keil 里跑）；
 2. **S2 通道扫描**：`config/config_board.h` 已把 `TEST_TRIGGER_USE_SW2` 置 1 → **拨 SW2=ON 即进扫描**
    （或把 `DEBUG_TEST_MODE` 置 1 编一个上电即扫描的调试固件）。Watch `g_dbg_ws_scan_idx`，
-   逐条记录"索引 ↔ 物理灯带 ↔ 灯数"（详见《从机重构清单》§六 ①）；
+   逐条记录"索引 ↔ 物理灯带 ↔ 灯数" —— **完整步骤/记录表/回填/排查见
+   [`../docs/从机通道扫描指南.md`](../docs/从机通道扫描指南.md)**；
 3. 扫描结果**只回填一处**：`config/config_ws2812.h` 的 `WS_LED_NUM_*`（灯带表与 DMA 缓冲都由它推导），
    再确认 S4~S6 要画在哪条灯带上（`config_light.h` 的 `SLV_STRIP_*`）。
 
