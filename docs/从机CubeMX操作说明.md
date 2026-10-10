@@ -88,8 +88,8 @@
 | Channel2 | `PWM Generation CH2` | PB7 | `LED_ROAD_1` "下"（92） |
 | Channel3 | `PWM Generation CH3` | PB8 | **老从机从未驱动** → 先配上，灯数待扫描确认 |
 
-> PB8（TIM4_CH3）是"丝印 DIN1 上灯带"那个悬案口：**先配上但 `led_num` 先填 0**，
-> 通道扫描时看它是否亮，再决定填多少灯数。
+> PB8（TIM4_CH3）：老从机**从不驱动**该口 → 通道/DMA 配好但 `led_num` 填 `0u`（不分配缓冲、不发送）。
+> 若日后确认该口接了灯带，只改 `WS_LED_NUM_SPARE` 一处（表与缓冲同源推导）。
 > ⚠️ PB8 与 CAN1 的备选复用脚、BOARD_ID 候选冲突 —— 确认 CAN1 仍在 **PA11/PA12**（不要被自动分配到 PB8/PB9）。
 
 ---
@@ -199,7 +199,7 @@ grep -c "define KEY[0-9]*_Pin" Core/Inc/main.h      # 期望: 10
 | 2 | 是否保留了 CAN2、是否删了别的外设 | 决定 `bsp_can.c` 要不要加角色分支 |
 | 3 | PB8（TIM4_CH3）是否接灯带（先目视/万用表） | 决定灯带表是 5 条还是 6 条 |
 | 4 | 从机板实物一共几块、每块对应灯板号（1~5） | 我把 `BUFF_NUM` 做成 config 宏（按板编译） |
-| 5 | 每块从机板的灯带条数与大致布局 | 与灯数一起在通道扫描时确认 |
+| 5 | 每块从机板的灯带条数与大致布局 | 已按老从机口径继承（87/262/320/120/92 + PB8 不驱动）；只剩"哪条在机械上叫什么"待结构组确认(H5) |
 
 之后我会写：`application/hit_detect.c`（EXTI 采集 + 环数查表 + armed/fired/locked/mishit）、
 `application/buff.c` 的从机状态机（替换主机构建专用段）、`application/light.c` 的灯板图案库

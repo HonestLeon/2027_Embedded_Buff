@@ -77,6 +77,8 @@ extern volatile buff_rx_t g_buff_rx;
 void buff_can_rx_poll(void);        /* 1ms 调用: 排空 CAN1 下行帧 → g_buff_rx */
 
 /* ── 调试观察量(长期保留) ── */
+/* ⚠ 下面三个只在**主机构建**有值(写入点全在 #if BOARD_ROLE_MASTER 段内)；从机恒 0，
+   从机收帧请看 g_buff_rx / buff_can_rx_poll()。 */
 extern volatile uint32_t g_dbg_can1_rx_frames;   /* 收到的从机帧累计数 */
 extern volatile uint8_t  g_dbg_buff_state;       /* 状态机当前状态 */
 extern volatile uint8_t  g_dbg_buff_round;       /* 当前轮次 */
