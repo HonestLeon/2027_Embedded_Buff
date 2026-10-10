@@ -53,6 +53,29 @@ bool buff_slave_report_parse(const uint8_t in[8], slave_report_t *r);
 void buff_random_small(uint8_t arr[], uint8_t length, uint8_t min, uint8_t max);
 void buff_random_big(uint8_t arr1[], uint8_t arr2[], uint8_t length, uint8_t min, uint8_t max);
 
+/* ── S3.1 从机接收路径(1ms 排空 → 目标状态幂等覆盖 + 事件计数) ──
+ * 从机由 it.c 在 1ms 节拍里调用; 主机版不调用(主机收的是 0x160 回报)。
+ * 依据: 大符轮次切换的两帧只隔 150ms, 4Hz 排空会吞掉熄灭帧 → 旧灯板不熄。
+ * 见《从机代码重构计划》S3.1 / 《从机重构清单》§四。 */
+typedef struct
+{
+    volatile uint32_t frames;       /* 解析成功的下行帧(0x161)累计数 */
+    volatile uint32_t bad_frames;   /* 包头/范围不对被丢掉的帧数       */
+    volatile uint8_t  seq;          /* 每收到一有效帧 +1: 4Hz/S5 据此判有新事件 */
+    volatile uint8_t  cmd;          /* 0x01熄灭 0x02点亮 0x03复位 0x04全亮 */
+    volatile uint8_t  is_big;       /* [2] 1=大符 */
+    volatile uint8_t  is_blue;      /* [4] 1=蓝 0=红 */
+    volatile uint8_t  panel_a;      /* [3] 1~5 */
+    volatile uint8_t  panel_b;      /* [5] 大符第二块 1~5, 0=无 */
+    volatile uint8_t  round;        /* [6] 已激活组数 0~5(进度条 n/5 用) */
+    volatile uint16_t age_ms;       /* 距最近一有效帧多少 ms */
+    volatile uint8_t  max_burst;    /* 单次 poll 排空到的最大帧数(主机全亮连发 5 帧属正常) */
+} buff_rx_t;
+
+extern volatile buff_rx_t g_buff_rx;
+
+void buff_can_rx_poll(void);        /* 1ms 调用: 排空 CAN1 下行帧 → g_buff_rx */
+
 /* ── 调试观察量(长期保留) ── */
 extern volatile uint32_t g_dbg_can1_rx_frames;   /* 收到的从机帧累计数 */
 extern volatile uint8_t  g_dbg_buff_state;       /* 状态机当前状态 */
@@ -71,7 +94,7 @@ typedef enum
 
 /* ── 状态机 ── */
 void buff_init(void);
-void buff_step(void);           /* 4Hz: 排空 bsp_can1_pop + 拨码变化 → 转换/发帧 */
+void buff_step(void);           /* 4Hz: 主机=排空+状态机+发帧; 从机=消费 g_buff_rx(S5) */
 void buff_tick(float dt);       /* 1ms: 2.5s超时 / 1s窗口 计时 */
 
 #endif /* BUFF_H */

@@ -440,10 +440,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     g_sched_tick_cnt++;
 
     /* ── 1ms 节拍 ───────────────────────────────── */
+    buff_can_rx_poll();                /* ★S3.1 从机收帧: 1ms 排空 CAN1(150ms 两帧时序的前提) */
     bsp_ws2812_refresh_all();          /* dirty灯带刷新(每tick≤2条) */
     buff_tick(0.001f);                 /* 状态机计时(从机版 S5 落地) */
 
-    /* ── 拨码: 20ms 采样(消抖 4 次≈80ms 生效); 从机无电机, SW2 兼作白光扫描触发 ── */
+    /* ── 拨码 20ms 采样: 本板未接拨码, 采样只为与主机版同构/留扩展 → 业务禁止读 SW_* ── */
     if (++sw_div >= SWITCH_POLL_DIV)
     {
       sw_div = 0;
@@ -454,8 +455,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if (++frame_div >= SCHED_FRAME_DIV)
     {
       frame_div = 0;
-      buff_step();                     /* S5: CAN 出队 + 从机状态机(CAN 排空届时移到 1ms) */
-      light_tick();                    /* 灯效 + SW2 触发通道扫描 */
+      buff_step();                     /* S5: 消费 g_buff_rx → 从机状态机(排空已在 1ms 做完) */
+      light_tick();                    /* 灯效/灯带自检(从机只能用 DEBUG_TEST_MODE 触发) */
     }
   }
 }

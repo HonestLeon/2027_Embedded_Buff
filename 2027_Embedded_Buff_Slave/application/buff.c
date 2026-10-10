@@ -27,6 +27,7 @@
 #include "config_can.h"
 #include "bsp_can.h"
 #include "bsp_switch.h"
+#include "config_board.h"   /* BOARD_ROLE_MASTER: 状态机段按角色编译 */
 
 /* ── 协议字节位置 ─────────────────────────────────────────── */
 #define BF_HEAD                      0xAAu   /* 包头 */
@@ -180,6 +181,65 @@ void buff_random_big(uint8_t arr1[], uint8_t arr2[], uint8_t length, uint8_t min
     }
 }
 
+/* ═════════════════ S3.1 从机接收路径：1ms 排空 → 目标状态幂等覆盖 ══════════════
+ * 为什么必须 1ms：大符轮次切换时主机先发 0x01(熄灭旧对)、150ms 后才发 0x02(点亮新对)。
+ * 4Hz 才处理就会让后一帧覆盖前一帧 → 旧灯板不熄（老从机 200ms 单缓冲的老毛病，实测就是
+ * "熄灭不稳定"）。本函数只做"收帧→解析→覆盖目标状态+置事件"，不动灯效、不发上报 ——
+ * 那些留在 4Hz 逻辑帧与 S5 的从机状态机里。主机版构建不调用它（主机发 0x161、收 0x160）。
+ *
+ * 观测（调试器 Watch g_buff_rx）：
+ *   frames/bad_frames  有效帧与废帧计数；seq      每收到一帧 +1，S5 用它判"有新事件"；
+ *   cmd/is_big/...     最近一帧解析出的目标状态（幂等覆盖，与老代码"最后写入者赢"等价）；
+ *   age_ms             距最近一帧多少 ms；max_burst 单次 poll 一口气排空到的最大帧数
+ *                      （主机"全亮"会一次连发 5 帧，那一次 burst=5 属正常；持续 >1 才说明排空慢了）。 */
+
+volatile buff_rx_t g_buff_rx;
+
+
+void buff_can_rx_poll(void)
+{
+    uint32_t       id;
+    uint8_t        raw[8];
+    buff_frame_t   f;
+    uint8_t        burst = 0u;
+
+    if (g_buff_rx.age_ms < 0xFFFFu) { g_buff_rx.age_ms++; }
+
+    while (bsp_can1_pop(&id, raw))
+    {
+        if (id != CAN_ID_MASTER_TO_SLAVE)     /* 从机只认下行 0x161 */
+        {
+            continue;
+        }
+        if (buff_frame_parse(raw, &f))
+        {
+            g_buff_rx.cmd      = (uint8_t)f.cmd;   /* 幂等覆盖: 多帧连发也不会丢状态 */
+            g_buff_rx.is_big   = f.is_big;
+            g_buff_rx.is_blue  = f.is_blue;
+            g_buff_rx.panel_a  = f.panel_a;
+            g_buff_rx.panel_b  = f.panel_b;
+            g_buff_rx.round    = f.round;
+            g_buff_rx.age_ms   = 0u;
+            g_buff_rx.frames++;
+            g_buff_rx.seq++;
+            burst++;
+        }
+        else
+        {
+            g_buff_rx.bad_frames++;          /* 包头/命令/板号范围不对: 只计数, 不动状态 */
+        }
+    }
+    if (burst > g_buff_rx.max_burst)
+    {
+        g_buff_rx.max_burst = burst;
+    }
+}
+
+/* ══════════════════════════ 以下整段 = 主机构建专用 ══════════════════════════
+ * ⚠ 从机绝不能跑主机状态机: 它会每 250ms 往总线发 0x161(与真主机抢话)、上电就跑随机序列,
+ *   还会在 4Hz 里 bsp_can1_pop —— 与上面 1ms 的排空抢同一队列。
+ *   从机状态机(SLV_SLEEP/ARMED/ACTIVATED/ALL_ON)在 S5 落地; S3~S4 期间从机只收不发。 */
+#if BOARD_ROLE_MASTER
 /* ══════════════════════ 状态机(P6) ══════════════════════
  * ⚠【本段为"主机构建"专用】: 从机工程请把本节整段替换成从机状态机
  *   (休眠/待激活/已激活/全激活, 见《重构对照》第3节与从机模板 README)。
@@ -448,3 +508,21 @@ void buff_tick(float dt)
         break;
     }
 }
+
+#else   /* ── 从机构建: S3~S4 过渡期, 只收不发, 业务等 S5 ── */
+void buff_init(void)
+{
+    /* S5: 从机状态机初始化(进 SLV_SLEEP、清击打武装) */
+}
+
+void buff_step(void)
+{
+    /* S5: 消费 g_buff_rx(seq 变化 = 有新事件) → 从机状态机 + 灯效 + 上报 0x160
+       此处刻意不排空 CAN1: 排空在 1ms 的 buff_can_rx_poll() 里做。 */
+}
+
+void buff_tick(float dt)
+{
+    (void)dt;     /* S5: 打错/激活计时等 1ms 级事务放这里 */
+}
+#endif /* BOARD_ROLE_MASTER */

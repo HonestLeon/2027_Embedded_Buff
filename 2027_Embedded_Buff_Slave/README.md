@@ -38,7 +38,7 @@
 | 4 | `application/buff.c` | ⬜ 保留协议段（`buff_frame_pack/parse`、`buff_send_frame`、`buff_slave_report_parse`）**逐字节不动**；把"主机构建专用"的状态机段换成从机状态机（`SLV_SLEEP/ARMED/ACTIVATED/ALL_ON`） |
 | 5 | `application/hit_detect.c/.h` | ⬜ **新增**：EXTI 采集 + 环数查表 + `HD_ARMED/FIRED/LOCKED/MISHIT` 显式状态；**RDET9 环数必须实测核对** |
 | 6 | `application/light.c` | ⬜ 换成灯板图案库（待激活+箭头流动 / 环数 / **中部灯臂进度 n/5（规则要求，老从机未实现）** / 全激活）；标定值继承 `config_light.h` |
-| 7 | `Core/Src/stm32f4xx_it.c` | ⬜ 1ms 节拍里 **排空 CAN**（`bsp_can1_pop`）+ 灯带刷新；4Hz 帧跑状态机与图案。**禁止 `HAL_Delay` 阻塞**（当前仍是主机快照的调度内容，S3/S5 一并改） |
+| 7 | `Core/Src/stm32f4xx_it.c` + `application/buff.c` | ✅ **S3.1**：1ms 节拍里 `buff_can_rx_poll()` 排空 CAN1 → 目标状态写进 `g_buff_rx`；主机状态机段已用 `#if BOARD_ROLE_MASTER` 在从机侧关闭 → **从机只收不发**，总线上不会再有从机发出的 `0x161`。4Hz 只跑 `buff_step()`(S5 消费事件) 与灯效。**禁止 `HAL_Delay` 阻塞** |
 | 8 | Keil | ⬜ 删 `motor.c` 已完成；S4 时 `application` Group 加 `hit_detect.c`；包含路径不变 |
 
 > 本表只是**入口速查**；逐条依据、改动理由与验收口径以《从机重构清单》§三/§五/§六为唯一出处，
@@ -55,7 +55,7 @@
 
 | 文件 | 共享内容 |
 |---|---|
-| `application/buff.c/.h` | 协议段：帧结构、`buff_frame_pack/parse`、`buff_send_frame`、`buff_slave_report_parse` |
+| `application/buff.c/.h` | 协议段：帧结构、`buff_frame_pack/parse`、`buff_send_frame`、`buff_slave_report_parse`（**逐字节保持与主机一致**）。当前从机版另有两处差异：① 新增 S3.1 接收路径 `buff_can_rx_poll()` / `g_buff_rx`；② 主机状态机整段被 `#if BOARD_ROLE_MASTER` 包住（从机侧不编译，S5 换成从机状态机）|
 | `bsp/bsp_can.c/.h`、`bsp/bsp_ws2812.c/.h`、`bsp/bsp_switch.c/.h`、`bsp/bsp_rng.c/.h` | 板级驱动 |
 | `config/config_can.h`、`config/config_ws2812.h`（时序部分）、`config/config_light.h`（标定值） | 参数与标定 |
 
