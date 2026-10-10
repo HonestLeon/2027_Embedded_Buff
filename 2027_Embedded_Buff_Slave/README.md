@@ -33,7 +33,7 @@
 | # | 文件 | 改动 |
 |---|---|---|
 | 1 | `config/config_board.h` | ✅ `BOARD_ROLE_MASTER=0`；新增 **`SLAVE_PANEL_NUM`**(1~5，越界 `#error`)，**每块板烧录前改这一处** + 固件文件名带板号；SW2 挪作白光扫描触发 |
-| 2 | `config/config_ws2812.h` + `bsp/bsp_ws2812.c` | ✅ 灯带表 1 条 → **6 条**，灯数单点定义 `WS_LED_NUM_*`（老口径 87/262/320/120/92/0，待 S2 实测）；缓冲随之开出，实测 `.bss` **49.6KB**/128KB（scatter 里没有 CCM，不用担心误放）；**灯数仍是要 S2 标定的标定值** |
+| 2 | `config/config_ws2812.h` + `bsp/bsp_ws2812.c` | ✅ 灯带表 1 条 → **6 条通道(5 条接灯带)**，灯数单点定义 `WS_LED_NUM_*` = 87/262/320/120/92/0（**硬件与 2025 相同 → 直接继承老从机口径，无需标定**；PB8 老代码从不驱动故置 0）；缓冲同源推导，实测 `.bss` **46,208B ≈ 45.1KB** / 128KB（scatter 里没有 CCM，不会误放） |
 | 3 | `config/config_motor.h`、`application/motor.c/.h` | ✅ **已删**；`main.c` 的 init、`it.c` 的调度、Keil Group（`.uvprojx`/`.uvoptx`）均已去掉 |
 | 4 | `application/buff.c` | ⬜ 保留协议段（`buff_frame_pack/parse`、`buff_send_frame`、`buff_slave_report_parse`）**逐字节不动**；把"主机构建专用"的状态机段换成从机状态机（`SLV_SLEEP/ARMED/ACTIVATED/ALL_ON`） |
 | 5 | `application/hit_detect.c/.h` | ⬜ **新增**：EXTI 采集 + 环数查表 + `HD_ARMED/FIRED/LOCKED/MISHIT` 显式状态；**RDET9 环数必须实测核对** |
