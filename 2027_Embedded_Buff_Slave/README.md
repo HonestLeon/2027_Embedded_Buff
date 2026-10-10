@@ -18,7 +18,7 @@
 
 ## 快速开始
 
-**进度：S0 基线 ✅ / S1 config 从机化 ✅（2026-10-06）→ 下一步就是 S2 通道扫描。**
+**进度：S0~S2 ✅ / S3 代码 ✅（待验）→ 按计划**连续写完 S4~S6，台架只在 S7 一次做**。**
 
 1. Keil 打开 `MDK-ARM/*.uvprojx`，Rebuild 一次确认（语法/类型已用
    `arm-none-eabi-gcc -fsyntax-only -Wall -Wextra` 验过：0 error 0 warning；链接与烧录仍需你在 Keil 里跑）；

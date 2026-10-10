@@ -46,7 +46,7 @@ STM32F405RGT6 + HAL，Keil MDK-ARM 工程，由 STM32CubeMX 6.15 生成。
 | P5 | `motor`（双环 PID + 大符正弦前馈） | ✅ 代码完成（圈时间未标定，见待办 M1） |
 | P6 | `buff` 大小符状态机 + 随机序列 | ✅ |
 | P7 | 整机联调与验收（与旧从机对接 ✅ / 电机圈时间标定 ⬜ / 上电色序专项 ⬜ / 烤机 ⬜） | 🟡 |
-| P8 | **从机重构**（见 `docs/从机代码重构计划.md`） | 🟡 S0~S1 ✅ / S2 口径继承 ✅(无需标定) / **S3 代码 ✅ 待台架验收** / 下一步 S4 |
+| P8 | **从机重构**（见 `docs/从机代码重构计划.md`） | 🟡 S0~S2 ✅ / S3 代码 ✅ / **S4~S6 连续编码**，台架统一在 S7 |
 
 ## 硬件要点速查（主机）
 
@@ -68,6 +68,7 @@ STM32F405RGT6 + HAL，Keil MDK-ARM 工程，由 STM32CubeMX 6.15 生成。
 | `g_dbg_ws_scan_idx` | `application/light.c` | 灯带通道扫描：`DEBUG_TEST_MODE=1` 时该值 = 当前点亮灯带的索引（0xFF=未扫描） |
 | `g_dbg_buff_state` / `g_dbg_buff_round` | `application/buff.c` | 大小符状态机状态与轮次（对照转换表看流程） |
 | `g_dbg_can1_rx_frames` | `application/buff.c` | 收到的从机回报帧累计数 |
+| `g_buff_rx`（从机） | `application/buff.c` | 从机收帧快照：`frames`/`bad_frames`/`seq`/`cmd`/`round`/`age_ms`/`max_burst` —— **S7 组 1 的主判据** |
 | `g_dbg_motor` | `application/motor.c` | 电机环快照：`fb_frames`(反馈帧累计, 判断速度环是否闭环)、`fb_speed`/`fb_angle`、`target`/`position`/`delat`、`cmd_current` |
 
 ## 文档（`docs/`）
