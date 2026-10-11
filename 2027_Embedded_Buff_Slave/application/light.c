@@ -14,10 +14,12 @@
  *                 常亮与 [6]/round 无任何关联 —— 复刻口径, n/5 归 S8)
  *   SLV_ALL_ON    上/下两条整条定值    (老 state4; 外观待与规则图 5-23 对照 → S7 组 4)
  *
- * 亮度(§3.5 亮度换算, 差异 #14): 老 Buff_* 的 R/B 入参是**阈值化**的(>0→255) →
- * 图案段/箭头/环数都是 255 满亮度, 不受位序影响; 只有灯臂常亮与全激活的"定值 10"落在
- * 位序陷阱上(老 LSB-first 灯珠实际≈80)。新驱动 MSB-first, 先按老"设计值"10 实现,
- * 10/80 观感定值归 S7 组 4 台架定(SLV_LEVEL_* 一处改)。
+ * 亮度(§3.5 亮度换算, 差异 #14; 2026-10-10 验收修正): 老函数**不做阈值化**(那只在从未被
+ * 调用的死代码里), 入参直接写灯珠 → 老调用点两档: `Buff_Activatable(255,·)` 靶面 19 段、
+ * `Buff_Activating` 内部写死 255(环数段) = 满亮度; `Buff_Arrowhead_Flowing(&t,10,·)` 箭头、
+ * state3 灯臂常亮、state4 全激活 = **定值 10**(老 LSB-first 实际观感≈80, 位序陷阱三处)。
+ * 新驱动 MSB-first → 三处"10"全部走 `SLV_LEVEL_ARROW/PROGRESS/ALL_ON`(config 一处改),
+ * 10/80 观感定值归 S7 组 4 台架拍板。
  *
  * 动画节拍(S6.1): 老代码靠主循环≈200ms + 补丁变量 i/test_num 喂相位, 每 4 圈步进(≈800ms);
  * 新实现 = 4Hz 逻辑帧计数 + 模块内自持相位(LIGHT_ARROW_STEP_TICKS=4 → ≈1s/步),
@@ -118,9 +120,12 @@ static void ring_show(uint8_t circle)
 static void draw_armed(void)
 {
     uint8_t r, b;
+    uint8_t ar, ab;
     uint8_t i, k;
 
-    scene_color(&r, &b);
+    scene_color(&r, &b);                            /* 255 档: 靶面 19 段 */
+    ar = s_blue ? 0u : (uint8_t)SLV_LEVEL_ARROW;    /* 10 档: 箭头(老调用实参, 见文件头) */
+    ab = s_blue ? (uint8_t)SLV_LEVEL_ARROW : 0u;
 
     /* 靶面 19 段(老 Buff_Activatable: 整条清掉再逐段画) */
     bsp_ws2812_fill(SLV_STRIP_TARGET, 0u, 0u, 0u);
@@ -130,9 +135,9 @@ static void draw_armed(void)
                            s_armed_segs[i].len, r, 0u, b);
     }
 
-    /* 灯臂箭头(老 Buff_Arrowhead_Flowing: 整条清掉 → 11 份偏移 k*4-phase 叠加。
-       老越界守卫只查起始索引; 新驱动统一校验 start+count(差异 #16 有意加强)
-       → 贴边 1 颗的段整体不写, 观感等价且不再写坏相邻缓冲 */
+    /* 灯臂箭头(老 Buff_Arrowhead_Flowing: 整条清掉 → 11 份偏移 k*4-phase 叠加,
+       颜色 = 老调用原值 10。老越界守卫只查起始索引; 新驱动统一校验 start+count
+       (差异 #16 有意加强) → 贴边 1 颗的段整体不写, 观感等价且不再写坏相邻缓冲 */
     bsp_ws2812_fill(SLV_STRIP_ARM, 0u, 0u, 0u);
     for (k = 0u; k < ARROW_COPIES; k++)
     {
@@ -145,7 +150,7 @@ static void draw_armed(void)
             if (start >= 0 && start < (int32_t)WS_LED_NUM_ARM)
             {
                 bsp_ws2812_set_rgb(SLV_STRIP_ARM, (uint16_t)start,
-                                   s_arrow_rows[i].len, r, 0u, b);
+                                   s_arrow_rows[i].len, ar, 0u, ab);
             }
         }
     }
