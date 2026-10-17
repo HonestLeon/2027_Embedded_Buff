@@ -39,4 +39,9 @@ void       hit_detect_set_armed(bool armed);   /* 由从机状态机驱动: 仅 
 void       hit_detect_task(void);              /* 4Hz: 排空记录环 → 查表判定 → 置事件 */
 hd_event_t hit_detect_take(uint8_t *circle, uint16_t *pin);  /* 取走并清空待消费事件 */
 
+/* 状态转换时丢弃"转态前发生、转态后才会被消费"的击打(差异表 #22):
+ * 清空 EXTI 记录环 + 待消费事件。调用点: slv_enter()(每次转态) ——
+ * 否则板子被熄灭后, 4Hz 才消费的旧记录会把状态机重新拉回 ACTIVATED。 */
+void hit_detect_flush(void);
+
 #endif /* HIT_DETECT_H */

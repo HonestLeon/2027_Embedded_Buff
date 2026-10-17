@@ -111,6 +111,15 @@ void hit_detect_init(void)
     s_ev = HD_EV_NONE;
 }
 
+/* 差异表 #22: 转态时丢弃在途击打 —— 记录环里"转态前采到的沿"与待消费事件一律作废。
+ *   EXTI 在 1ms 里写记录环, 4Hz 的 hit_detect_task() 才把记录变成事件, buff_step() 再消费;
+ *   若中途状态已变(例如主机发来熄灭帧 → 回 SLEEP), 旧记录就不该再有语义。 */
+void hit_detect_flush(void)
+{
+    s_rec_tail = s_rec_head;      /* 记录环置空(ISR 只会继续往后写) */
+    s_ev       = HD_EV_NONE;      /* 待消费事件作废 */
+}
+
 void hit_detect_set_armed(bool armed)
 {
     s_armed = armed;

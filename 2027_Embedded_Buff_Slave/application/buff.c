@@ -246,6 +246,7 @@ void buff_can_rx_poll(void)
                 {
                     ev = (uint8_t)f.cmd;
                 }
+#if SLV_IMPLICIT_OFF_EN
                 else if (f.cmd == BF_LIGHT && f.is_big != 0u)
                 {
                     /* 差异表 #21: 大符下"不在本轮这一对里" = 该灭。
@@ -253,6 +254,7 @@ void buff_can_rx_poll(void)
                     ev = (uint8_t)BF_EXTINGUISH;
                     implicit = 1u;      /* 计数留给 buff_tick: 只有"确实还亮着"才算漏帧 */
                 }
+#endif
                 if (ev != 0u)
                 {
                     g_buff_rx.my_ev_cmd  = ev;      /* 同窗多条: 后到覆盖 = 老代码"最后写入者赢" */
@@ -581,6 +583,7 @@ volatile struct
     uint32_t mishit_ev;
     uint32_t report_hit;
     uint32_t report_mishit;
+    uint32_t stale_hit;                     /* 差异表 #22: 被丢弃的陈旧击打事件数 */
     uint8_t  is_big;
     uint8_t  is_blue;
     uint8_t  round;
@@ -607,6 +610,7 @@ static void slv_report(bool mishit)
  * 只有"被击中"这一条路进 ACTIVATED(见 buff_step) → 上报天然只发一次。 */
 static void slv_enter(slv_state_t st)
 {
+    hit_detect_flush();                      /* 差异表 #22: 转态即作废在途击打 */
     s_slv = st;
     hit_detect_set_armed(st == SLV_ARMED);   /* 仅待激活允许被击中(老 once&&state==2 语义) */
     light_set_scene(st, s_circle);
@@ -682,6 +686,14 @@ void buff_step(void)
     g_dbg_slv.round   = g_buff_rx.round;
 
     ev = hit_detect_take(&circle, &pin);
+    if (ev == HD_EV_HIT && s_slv != SLV_ARMED)
+    {
+        /* 差异表 #22: 已不在"待激活"态还收到击打事件 = 转态前的陈旧事件(4Hz 消费滞后
+           ≤250ms 造成), 直接丢弃: 否则板子被熄灭后会被重新拉回 ACTIVATED,
+           大符下表现为"亮着的灯臂熄灭后一直不亮"(只有靶面环数在亮)。 */
+        g_dbg_slv.stale_hit++;
+        ev = HD_EV_NONE;
+    }
     if (ev == HD_EV_HIT)
     {
         s_circle = circle;
