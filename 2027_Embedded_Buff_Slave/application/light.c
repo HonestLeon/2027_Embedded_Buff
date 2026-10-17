@@ -9,9 +9,13 @@
  * 外观 → 场景(函数对应关系):
  *   SLV_SLEEP     5 条全灭            (老 state1: 每圈清 5 条)
  *   SLV_ARMED     靶面 19 段 + 灯臂箭头流动 (老 state2: Buff_Activatable + Buff_Arrowhead_Flowing)
- *   SLV_ACTIVATED 靶面环数段 + 灯臂/侧灯臂两条**整条常亮定值** (老 state3: Buff_Activating;
- *                 1 环特殊 = 1/2/4/6/8/10 六段叠加, 老 main.c 原样;
- *                 常亮与 [6]/round 无任何关联 —— 复刻口径, n/5 归 S8)
+ *   SLV_ACTIVATED 靶面环数段 + 灯臂/侧灯臂(老 state3: Buff_Activating;
+ *                 1 环特殊 = 1/2/4/6/8/10 六段叠加, 老 main.c 原样)
+ *                 ⚠ 灯臂两组按模式分叉(差异表 #20, 2026-10 用户定案):
+ *                   小符 = 老 state3 原样, 两条整条常亮(定值 SLV_LEVEL_PROGRESS);
+ *                   大符 = **打中即熄灭**(规则: 本灯臂已打完, 未打中的另一块由主机的
+ *                          熄灭帧处理) —— 老固件无此分叉, 一律常亮。
+ *                 进度 n/5(S8) 将替换大符的"熄灭", 按 round 分段点亮同两条。
  *   SLV_ALL_ON    上/下两条整条定值    (老 state4; 外观待与规则图 5-23 对照 → S7 组 4)
  *
  * 亮度(§3.5 亮度换算, 差异 #14; 2026-10-10 验收修正): 老函数**不做阈值化**(那只在从未被
@@ -51,6 +55,7 @@ static const light_seg_t s_arrow_rows[] = LIGHT_ARROWHEAD_ROWS; /* 老 Buff_Arro
 static slv_state_t s_scene = SLV_SLEEP;
 static uint8_t     s_circle;        /* ACTIVATED 的环数(1~10; 0=异常, 不画段) */
 static bool        s_blue;          /* 帧 [4]: 0=红 1=蓝 */
+static bool        s_big;           /* 帧 [2]: 0=小符 1=大符(只影响 ACTIVATED 的灯臂处理) */
 static uint8_t     s_phase;         /* 箭头相位 0..3(老 static count) */
 static uint8_t     s_phase_div;     /* 每 4 逻辑帧步进一次(老 i 0..3) */
 
@@ -63,6 +68,7 @@ volatile struct
     uint8_t phase;        /* 箭头相位(应每 4 帧 +1, 4 归 0) */
     uint8_t phase_div;
     uint8_t test;         /* 1=白光自检进行中 */
+    uint8_t big;          /* 帧 [2] 镜像: 1=大符(ACTIVATED 时灯臂熄灭) */
 } g_dbg_pat;
 
 /* ── 白光逐条自检(《从机灯带自检与排障》; 本板未接拨码 → 只能 DEBUG_TEST_MODE 宏触发) ──
@@ -187,18 +193,25 @@ static void draw_activated(void)
         ring_show(s_circle);
     }
 
-    /* 灯臂 + 侧灯臂: 两条整条常亮, 定值与 [6]/round 无关(复刻老行为, n/5 归 S8)。
-       老代码红=(10,0,0) 蓝=(0,0,10) —— 值走 SLV_LEVEL_*(位序陷阱见文件头) */
-    lvl = (uint8_t)SLV_LEVEL_PROGRESS;
-    if (s_blue)
+    /* 灯臂 + 侧灯臂 —— 按模式分叉(差异表 #20):
+       小符: 老 state3 原样, 两条整条常亮(定值 10 档, 红=(10,0,0) 蓝=(0,0,10))。
+       大符: **打中即熄灭** —— 该灯臂已完成, 未打中的另一半块板由主机"熄灭旧对"帧处理。
+             这里不写 = 保持熄灭(清屏只发生在 light_set_scene 的转换点, 进入本态时已全清),
+             避免每 250ms 白刷 320+120 颗(差异表 #20 附注)。
+       ⚠ S8: 大符的"熄灭"要换成"进度 n/5"(按 round 分段点亮同两条)。 */
+    if (!s_big)
     {
-        bsp_ws2812_fill(SLV_STRIP_ARM,     0u, 0u, lvl);
-        bsp_ws2812_fill(SLV_STRIP_ARM_SIDE, 0u, 0u, lvl);
-    }
-    else
-    {
-        bsp_ws2812_fill(SLV_STRIP_ARM,     lvl, 0u, 0u);
-        bsp_ws2812_fill(SLV_STRIP_ARM_SIDE, lvl, 0u, 0u);
+        lvl = (uint8_t)SLV_LEVEL_PROGRESS;
+        if (s_blue)
+        {
+            bsp_ws2812_fill(SLV_STRIP_ARM,     0u, 0u, lvl);
+            bsp_ws2812_fill(SLV_STRIP_ARM_SIDE, 0u, 0u, lvl);
+        }
+        else
+        {
+            bsp_ws2812_fill(SLV_STRIP_ARM,     lvl, 0u, 0u);
+            bsp_ws2812_fill(SLV_STRIP_ARM_SIDE, lvl, 0u, 0u);
+        }
     }
 }
 
@@ -225,6 +238,7 @@ void light_init(void)
     s_scene = SLV_SLEEP;
     s_circle = 0u;
     s_blue = false;
+    s_big = false;
     s_phase = 0u;
     s_phase_div = 0u;
     s_test_mode = false;
@@ -250,6 +264,12 @@ void light_set_color(bool is_blue)
 {
     s_blue = is_blue;
     g_dbg_pat.blue = is_blue ? 1u : 0u;
+}
+
+void light_set_big(bool is_big)
+{
+    s_big = is_big;
+    g_dbg_pat.big = is_big ? 1u : 0u;
 }
 
 void light_tick(void)

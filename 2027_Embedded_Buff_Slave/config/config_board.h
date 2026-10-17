@@ -18,7 +18,7 @@
  * ⚠ 5 块板共用一个工程, 极易烧错: **输出固件文件名带上板号**
  *   (Keil: Options→Output→Name for Executable 改成 Buff_Slave_P<n>.hex, n 与本值一致),
  *   联机前逐块核对(《从机重构清单》§六 ⑫)。 */
-#define SLAVE_PANEL_NUM          1u
+#define SLAVE_PANEL_NUM          5u
 
 #if (SLAVE_PANEL_NUM < 1u) || (SLAVE_PANEL_NUM > 5u)
 #error "SLAVE_PANEL_NUM 必须是 1~5(与 config_buff.h 的 BUFF_PANEL_NUM 一致), 否则本机永不响应点亮帧"

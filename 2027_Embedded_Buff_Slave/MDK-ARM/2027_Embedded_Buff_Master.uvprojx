@@ -581,6 +581,36 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>config</GroupName>
+          <Files>
+            <File>
+              <FileName>config_board.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\config\config_board.h</FilePath>
+            </File>
+            <File>
+              <FileName>config_buff.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\config\config_buff.h</FilePath>
+            </File>
+            <File>
+              <FileName>config_can.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\config\config_can.h</FilePath>
+            </File>
+            <File>
+              <FileName>config_light.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\config\config_light.h</FilePath>
+            </File>
+            <File>
+              <FileName>config_ws2812.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\config\config_ws2812.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>

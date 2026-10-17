@@ -657,6 +657,7 @@ void buff_step(void)
     hd_event_t ev;
 
     light_set_color(g_buff_rx.is_blue != 0u);
+    light_set_big(g_buff_rx.is_big != 0u);   /* 差异表 #20: 大符打中即熄灭灯臂 */
     g_dbg_slv.is_big  = g_buff_rx.is_big;
     g_dbg_slv.is_blue = g_buff_rx.is_blue;
     g_dbg_slv.round   = g_buff_rx.round;

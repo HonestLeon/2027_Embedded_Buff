@@ -19,6 +19,10 @@ void light_set_scene(slv_state_t scene, uint8_t circle);
 /* [4] 颜色逐帧生效(老 Decode 对任何 0xAA 帧都刷 color_type, 不看板号 —— 差异表 #11) */
 void light_set_color(bool is_blue);
 
+/* [2] 大小符逐帧生效: 只影响"已激活"态的灯臂 —— 大符打中即熄灭, 小符保持老效果常亮
+ * (差异表 #20; 灯臂进度 n/5 属 S8, 届时替换大符的熄灭分支) */
+void light_set_big(bool is_big);
+
 /* 4Hz: 按当前场景重画(待激活的箭头相位每 LIGHT_ARROW_STEP_TICKS 帧步进一次) + 白光自检 */
 void light_tick(void);
 
