@@ -57,13 +57,15 @@ void buff_random_big(uint8_t arr1[], uint8_t arr2[], uint8_t length, uint8_t min
 extern volatile uint32_t g_dbg_can1_rx_frames;   /* 收到的从机帧累计数 */
 extern volatile uint8_t  g_dbg_buff_state;       /* 状态机当前状态 */
 extern volatile uint8_t  g_dbg_buff_round;       /* 当前轮次 */
+extern volatile uint32_t g_dbg_buff_refresh;     /* 大符"没打中换一对"的刷新次数 */
 
 /* ── 大小符状态机(与《代码架构设计》3.3 转换表一致) ── */
 typedef enum
 {
     BB_RESET = 0,       /* 复位: 重取随机序列 + 发全复位帧(从机回休眠) */
     BB_IDLE,            /* 待激活: 尚未点亮第一组 */
-    BB_LIT,             /* 已点亮: 等待被击中(第一组不设超时, 之后 2.5s) */
+    BB_LIT,             /* 已点亮: 等待被击中。大符=每 BUFF_BIG_REFRESH_MS 没打中就换一对
+                           (不推进进度、不复位); 小符=第一组不设超时, 之后 2.5s 无击打复位 */
     BB_HIT_WINDOW,      /* 大符首击后的 1s 窗口 */
     BB_COOLDOWN,        /* 熄灭旧对 → 点亮新对的间隔 */
     BB_ALL_ON,          /* 全亮展示, 2.5s 后复位 */

@@ -50,6 +50,7 @@
 volatile uint32_t g_dbg_can1_rx_frames = 0u;   /* 收到的从机帧累计数 */
 volatile uint8_t  g_dbg_buff_state     = 0u;   /* 当前状态(bb_state_t) */
 volatile uint8_t  g_dbg_buff_round     = 0u;   /* 当前轮次(已点亮次数) */
+volatile uint32_t g_dbg_buff_refresh   = 0u;   /* 【主机】大符"没打中换一对"的刷新次数 */
 
 /* ══════════════════════ 协议: 主机 → 从机 ══════════════════════ */
 
@@ -213,8 +214,16 @@ static bb_state_t s_state;
 static bool       s_big;                                    /* 当前模式(SW1) */
 static uint8_t    s_round;                                  /* 已点亮的轮次(0=未点亮) */
 static uint8_t    s_small[BUFF_RANDOM_ARRAY_LEN];           /* 小符: 不重复序列 */
-static uint8_t    s_big_a[BUFF_RANDOM_ARRAY_LEN];           /* 大符: 第一块 */
-static uint8_t    s_big_b[BUFF_RANDOM_ARRAY_LEN];           /* 大符: 第二块 */
+/* 大符改为"组合领用池"(2026-10-17): 一次预生成 5 组不够用 —— 没打中的每一轮都要
+ * 换**新的一对**, 而换出来的对既不能等于刚熄灭的那对, 也不能等于本局其它组(否则又
+ * 出现"同一对点两遍")。C(5,2)=10 种组合洗牌后逐个领用 → 本局点过的每一对互不相同。 */
+static uint8_t    s_pair_a[BUFF_BIG_PAIR_NUM];              /* 池: 组合第一块(1~5) */
+static uint8_t    s_pair_b[BUFF_BIG_PAIR_NUM];              /* 池: 组合第二块(1~5) */
+static uint8_t    s_pair_next;                              /* 下一个可领用的下标 */
+static bool       s_pair_valid;                             /* 池是否已洗过 */
+static uint8_t    s_cur_a;                                  /* 大符当前点亮的一对 */
+static uint8_t    s_cur_b;
+static bool       s_refresh;                                /* 本次冷却是"刷新"(不推进进度) */
 static float      s_t_state;                                /* 当前状态计时(s) */
 static slave_report_t s_rpt;                                /* 本帧事件并暂存 */
 
@@ -255,18 +264,42 @@ static void go(bb_state_t st)
     g_dbg_buff_state = (uint8_t)st;
 }
 
+/* ── 大符: 从"组合领用池"领一对(池 = 10 种组合洗牌后的排列, 逐个领用不回头) ──
+ * 一局内 5 轮 + 若干次刷新都从同一池里领 → 点过的每一对互不相同;
+ * 只有"整池领完(10 对都点过)"才重洗, 重洗后头一格有 1/10 概率正好又是当前这对,
+ * 那就往后让一格(洗牌保证第二格与第一格不同)。 */
+static void pair_take(uint8_t *a, uint8_t *b)
+{
+    if (!s_pair_valid || s_pair_next >= (uint8_t)BUFF_BIG_PAIR_NUM)
+    {
+        buff_random_big(s_pair_a, s_pair_b, BUFF_BIG_PAIR_NUM, 1u, (uint8_t)BUFF_PANEL_NUM);
+        s_pair_next  = 0u;
+        s_pair_valid = true;
+        if (s_pair_a[0u] == s_cur_a && s_pair_b[0u] == s_cur_b)
+        {
+            s_pair_next = 1u;
+        }
+    }
+    *a = s_pair_a[s_pair_next];
+    *b = s_pair_b[s_pair_next];
+    s_pair_next++;
+}
+
 /* ── 进入复位: 重新取随机序列 + 发全复位帧(从机回休眠) ── */
 static void do_reset(void)
 {
     if (s_big)
     {
-        buff_random_big(s_big_a, s_big_b, BUFF_RANDOM_ARRAY_LEN, 1u, (uint8_t)BUFF_PANEL_NUM);
+        s_pair_valid = false;               /* 池作废: 首次领用时重新洗一整池(10 组) */
+        s_cur_a      = 0u;                  /* 0 = 无当前对(板号合法域是 1~5) */
+        s_cur_b      = 0u;
     }
     else
     {
         buff_random_small(s_small, BUFF_RANDOM_ARRAY_LEN, 1u, (uint8_t)BUFF_PANEL_NUM);
     }
-    s_round = 0u;
+    s_refresh = false;
+    s_round   = 0u;
     send_cmd(BF_RESET, 0u, 0u, 0u);
     go(BB_IDLE);
 }
@@ -276,7 +309,8 @@ static void do_idle(void)
 {
     if (s_big)
     {
-        send_cmd(BF_LIGHT, s_big_a[0], s_big_b[0], 0u);
+        pair_take(&s_cur_a, &s_cur_b);
+        send_cmd(BF_LIGHT, s_cur_a, s_cur_b, 0u);
     }
     else
     {
@@ -296,7 +330,7 @@ static bool panel_in_current_target(uint8_t panel)
         {
             return false;
         }
-        return (panel == s_big_a[s_round - 1u]) || (panel == s_big_b[s_round - 1u]);
+        return (panel == s_cur_a) || (panel == s_cur_b);
     }
     return (s_round >= 1u) && (panel == s_small[s_round - 1u]);
 }
@@ -336,16 +370,31 @@ static void on_hit(uint8_t panel)
 /* ── 熄灭旧对(进入冷却) ── */
 static void enter_cooldown(void)
 {
-    send_cmd(BF_EXTINGUISH, s_big_a[s_round - 1u], s_big_b[s_round - 1u], s_round);
+    send_cmd(BF_EXTINGUISH, s_cur_a, s_cur_b, s_round);
     go(BB_COOLDOWN);
 }
 
-/* ── 冷却结束: 点亮新对 或 全亮 ── */
+/* ── 冷却结束: 点亮"新的一对" ──
+ * 只会被大符走到(BB_COOLDOWN 的两个入口 enter_cooldown / big_refresh_start 都在大符分支里)。
+ * 两种语义: ①已击中 → 推进一轮(s_round++)并点亮下一对;
+ *          ②没击中在刷新 → 进度不变, 只把当前对换成领用池里的下一对([6] 仍发本轮进度)。 */
 static void cooldown_done(void)
 {
+    const bool refresh = s_refresh;
+
+    s_refresh = false;
+    pair_take(&s_cur_a, &s_cur_b);
+
+    if (refresh)
+    {
+        send_cmd(BF_LIGHT, s_cur_a, s_cur_b, s_round);
+        go(BB_LIT);
+        return;
+    }
+
     if (s_round < (uint8_t)BUFF_BIG_ROUNDS)
     {
-        send_cmd(BF_LIGHT, s_big_a[s_round], s_big_b[s_round], s_round);
+        send_cmd(BF_LIGHT, s_cur_a, s_cur_b, s_round);
         s_round++;
         g_dbg_buff_round = s_round;
         go(BB_LIT);
@@ -382,6 +431,31 @@ static bool drain_report(void)
 
 /* ══════════════════════ 对外接口 ══════════════════════ */
 
+/* ── 大符"没打中就换一对"(BUFF_BIG_REFRESH_EN) ──
+ * 一个周期过去、这一对两块都没被打中: **不算激活失败**, 而是熄灭旧对 → 150ms →
+ * 点亮领用池里的下一对(s_round 不动 → 打符进度不受刷新影响, 也不会因刷新少打一轮)。
+ * 刷新前先把**已经到达**的从机回报处理干净: 回报在主机队列里最长要等 250ms 才被 4Hz
+ * 取走, 若正好压在周期边界上, 不排空就会被换对后的"非当前目标"判据丢掉这次得分。 */
+static void big_refresh_start(void)
+{
+    while (drain_report())
+    {
+        if (s_rpt.kind == SLAVE_RPT_RESET)
+        {
+            go(BB_RESET);
+            return;                             /* 打错复位优先, 本次不刷新 */
+        }
+        on_hit(s_rpt.panel);
+    }
+    if (s_state != BB_LIT)
+    {
+        return;                                 /* 已被这次击打推进 → 不刷新 */
+    }
+    s_refresh = true;
+    g_dbg_buff_refresh++;
+    enter_cooldown();
+}
+
 void buff_init(void)
 {
     s_big    = (bsp_switch_get().sw_buff != 0u);
@@ -393,14 +467,10 @@ void buff_init(void)
 
 void buff_step(void)
 {
-    /* ① 模式(SW1)中途变化 → 复位重来 */
-    if (s_big != (bsp_switch_get().sw_buff != 0u))
-    {
-        s_big = (bsp_switch_get().sw_buff != 0u);
-        go(BB_RESET);
-    }
-
-    /* ② 处理从机回报(每 4Hz 最多一个事件, 与老代码"一帧一次推进"一致) */
+    /* ① 处理从机回报(每 4Hz 最多一个事件, 与老代码"一帧一次推进"一致)
+     *    ⚠ 必须排在"模式采样"之前: 回报对应的点亮帧带着当时的 is_big(帧[2]),
+     *      若先按拨码切模式并整局复位, 紧随其后的击打回报就会被丢弃
+     *      (拨码抖动/未落定 → 白丢一次得分)。 */
     if (drain_report())
     {
         if (s_rpt.kind == SLAVE_RPT_RESET)
@@ -413,6 +483,13 @@ void buff_step(void)
         }
     }
 
+    /* ② 模式(SW1)中途变化 → 复位重来 */
+    if (s_big != (bsp_switch_get().sw_buff != 0u))
+    {
+        s_big = (bsp_switch_get().sw_buff != 0u);
+        go(BB_RESET);
+    }
+
 #if BUFF_P4_CAN_TEST
     /* P4 联调钩子(默认关闭): 4Hz 发一帧全复位, 便于 CAN 盒验证 CAN1 发送链路 */
     send_cmd(BF_RESET, 0u, 0u, 0u);
@@ -423,7 +500,7 @@ void buff_step(void)
     {
     case BB_RESET:      do_reset();            break;
     case BB_IDLE:       do_idle();             break;
-    case BB_LIT:        /* 等待击中(事件驱动) */ break;
+    case BB_LIT:        /* 等待击中; 大符另有"周期没打中就换一对"(见 buff_tick) */ break;
     case BB_HIT_WINDOW: /* 等待 1s 窗口(tick)  */ break;
     case BB_COOLDOWN:   /* 等待熄灭间隔(tick)  */ break;
     case BB_ALL_ON:     /* 等待 2.5s(tick)      */ break;
@@ -438,10 +515,19 @@ void buff_tick(float dt)
     switch (s_state)
     {
     case BB_LIT:
-        /* BUFF_FIRST_HIT_TIMEOUT_EN=0(当前设置): 第一块不设计时, 从第二块起 2.5s 无击打复位
-           =1: 任何被点亮的装甲模块(含第一块)都受 2.5s 约束 */
-        if ((BUFF_FIRST_HIT_TIMEOUT_EN || s_round >= 2u) &&
-            s_t_state >= ((float)BUFF_HIT_TIMEOUT_MS / 1000.0f))
+        /* 大符(BUFF_BIG_REFRESH_EN=1, 当前设置): 每个周期没打中 → 换**新的一对**继续,
+           不推进进度、不复位(见 big_refresh_start)。
+         * 其余情形(小符 / 开关置 0 回到老行为): 第一块不设计时(BUFF_FIRST_HIT_TIMEOUT_EN=0),
+           从第二块起 2.5s 无击打 → 整局复位。 */
+        if (s_big && BUFF_BIG_REFRESH_EN)
+        {
+            if (s_t_state >= ((float)BUFF_BIG_REFRESH_MS / 1000.0f))
+            {
+                big_refresh_start();
+            }
+        }
+        else if ((BUFF_FIRST_HIT_TIMEOUT_EN || s_round >= 2u) &&
+                 s_t_state >= ((float)BUFF_HIT_TIMEOUT_MS / 1000.0f))
         {
             go(BB_RESET);
         }
