@@ -159,24 +159,48 @@ void buff_random_small(uint8_t arr[], uint8_t length, uint8_t min, uint8_t max)
     }
 }
 
-/* 老 generateUniqueRandomArray_BIG_BUFF:
- * arr1 允许任意重复(大符前后两次的灯臂可以一样); arr2[i] 只要求与 arr1[i] 不同 */
+/* 大符随机: 5 组**互不相同**的"两块组合" —— 有意改掉老 generateUniqueRandomArray_BIG_BUFF。
+ * 老算法只约束"组内 a≠b"(arr1 任意重复), 组与组之间不管 →
+ *   同一对(无序相同也算)会重复出现。主机侧 20 万局实测: 相邻两轮同对 **10.0%**,
+ *   一局内平均出现 **0.91 次**重复组合 → 场上表现是"熄灭旧对 → 150ms → 点亮新对"
+ *   点的还是刚才那两块, 看着像 bug, 故改掉(《大符思路》"前后两次的灯臂可以一样"作废)。
+ * 做法: 5 块板共 C(5,2)=10 种组合, 对编号表做**无重复抽样**(部分 Fisher–Yates)取 5 组 →
+ *   ①任意两轮不是同一对  ②每组内两块不同(枚举天然 a<b)  ③各组合等概率(实测 ±0.5%)。
+ * 副产品(覆盖变好): 某块板整局一次都不出现的概率 老 7.8%(0.6^5) → 新 2.4%(C(6,5)/C(10,5));
+ *   代价是组合空间被约束在"5 个不同组合"内, 每块板平均出场 2.00 次(实测)。
+ * ⚠ 前提: length ≤ C(max-min+1, 2) 且 max-min+1 ≤ BUFF_PANEL_NUM
+ *   (本工程 5 组 / 10 种组合, 越界由 config_buff.h 的 #error 拦住)。 */
 void buff_random_big(uint8_t arr1[], uint8_t arr2[], uint8_t length, uint8_t min, uint8_t max)
 {
-    for (uint8_t i = 0; i < length; i++)
+    const uint8_t n      = (uint8_t)(max - min + 1u);            /* 灯板数 */
+    const uint8_t pair_n = (uint8_t)(n * (n - 1u) / 2u);         /* 可选组合数 */
+    uint8_t       pool[BUFF_BIG_PAIR_NUM];
+
+    for (uint8_t k = 0u; k < pair_n; k++)
     {
-        arr1[i] = (uint8_t)(min + (uint8_t)(rand() % (int)(max - min + 1)));
+        pool[k] = k;                     /* 编号表 0..pair_n-1, 下面打乱前 length 个 */
     }
 
-    for (uint8_t i = 0; i < length; i++)
+    for (uint8_t i = 0u; i < length; i++)
     {
-        uint8_t value;
-        do
-        {
-            value = (uint8_t)(min + (uint8_t)(rand() % (int)(max - min + 1)));
-        } while (value == arr1[i]);
+        uint8_t j   = (uint8_t)(i + (uint8_t)(rand() % (int)(pair_n - i)));
+        uint8_t tmp = pool[i];
+        uint8_t code;
+        uint8_t a   = 0u;
 
-        arr2[i] = value;
+        pool[i] = pool[j];               /* 与"未抽区"首位交换 = 本组合不再被抽到 */
+        pool[j] = tmp;
+        code    = pool[i];
+
+        /* 组合编号 → (a,b): a 号板后面还有 n-1-a 个组合(b = a+1..n-1) */
+        while (code >= (uint8_t)(n - 1u - a))
+        {
+            code = (uint8_t)(code - (n - 1u - a));
+            a++;
+        }
+
+        arr1[i] = (uint8_t)(min + a);
+        arr2[i] = (uint8_t)(min + a + 1u + code);
     }
 }
 

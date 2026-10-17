@@ -29,6 +29,15 @@
  *   若用 200ms 单缓冲的从机与之对接, 熄灭仍会丢失(旧从机固有缺陷, 新从机已修复)。 */
 #define BUFF_RANDOM_ARRAY_LEN    5     /* 【仅主机】随机序列长度 */
 
+/* ── 【主从共用常量, 仅主机随机用到】大符可用组合数 = C(BUFF_PANEL_NUM, 2) ──
+ * buff_random_big() 从这 C 种"两块组合"里**无重复**抽 BUFF_RANDOM_ARRAY_LEN 组,
+ * 保证 5 轮不会出现同一对点两遍(函数注释见与主机逐字节一致的 buff.c)。 */
+#define BUFF_BIG_PAIR_NUM        (BUFF_PANEL_NUM * (BUFF_PANEL_NUM - 1) / 2)
+
+#if BUFF_RANDOM_ARRAY_LEN > BUFF_BIG_PAIR_NUM
+#error "大符轮数超过可用两两组合数 C(BUFF_PANEL_NUM,2), buff_random_big 无法保证各组互不相同"
+#endif
+
 /* ── 【仅主机】小符需要击中的次数 ──
  * 5 = 按规则(5 个灯板各一次)              ← 新实现默认
  * 6 = 复刻 2025 老固件的实际行为: 老代码 `num[counter]` 在 counter==5 时越界读
