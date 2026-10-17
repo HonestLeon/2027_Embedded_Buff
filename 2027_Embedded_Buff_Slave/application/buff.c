@@ -230,10 +230,13 @@ void buff_can_rx_poll(void)
 
             /* S5: 逐帧锁存"与本板有关"的命令(老 Decode 的匹配规则:
                0x03/0x04 广播不看板号; 0x01/0x02 必须 [3]或[5]==SLAVE_PANEL_NUM)。
+               ★差异表 #21 隐式熄灭: 大符的点亮帧本身就定义了"本轮该亮的集合",
+                 不在这个集合里的板一律灭 —— 熄灭帧丢了也能在 150ms 后自愈。
                必须在这里(1ms、逐帧)做, 不能等 4Hz 看 cmd 镜像 —— 同一逻辑帧窗口内
                别人的帧后到就会吃掉发给本板的熄灭帧(老单缓冲缺陷的翻版)。 */
             {
                 uint8_t ev = 0u;
+                uint8_t implicit = 0u;
                 if (f.cmd == BF_RESET || f.cmd == BF_ALL_ON)
                 {
                     ev = (uint8_t)f.cmd;
@@ -243,10 +246,18 @@ void buff_can_rx_poll(void)
                 {
                     ev = (uint8_t)f.cmd;
                 }
+                else if (f.cmd == BF_LIGHT && f.is_big != 0u)
+                {
+                    /* 差异表 #21: 大符下"不在本轮这一对里" = 该灭。
+                       仅大符: 小符打过的板要保持亮环数(累计显示)。 */
+                    ev = (uint8_t)BF_EXTINGUISH;
+                    implicit = 1u;      /* 计数留给 buff_tick: 只有"确实还亮着"才算漏帧 */
+                }
                 if (ev != 0u)
                 {
                     g_buff_rx.my_ev_cmd  = ev;      /* 同窗多条: 后到覆盖 = 老代码"最后写入者赢" */
                     g_buff_rx.my_ev_valid = 1u;
+                    g_buff_rx.my_ev_implicit = implicit;
                     g_buff_rx.my_ev_seq++;
                 }
             }
@@ -618,6 +629,7 @@ void buff_tick(float dt)
 {
     slv_state_t tgt;
     uint8_t     cmd;
+    uint8_t     impl;
 
     (void)dt;
     if (g_buff_rx.my_ev_valid == 0u)
@@ -625,7 +637,9 @@ void buff_tick(float dt)
         return;
     }
     cmd = g_buff_rx.my_ev_cmd;
+    impl = g_buff_rx.my_ev_implicit;
     g_buff_rx.my_ev_valid = 0u;
+    g_buff_rx.my_ev_implicit = 0u;
     g_dbg_slv.ev_cmd = cmd;
     g_dbg_slv.ev_cnt++;
 
@@ -641,6 +655,11 @@ void buff_tick(float dt)
     {
         tgt = SLV_SLEEP;
         s_circle = 0u;
+        if (impl != 0u && s_slv != SLV_SLEEP)
+        {
+            /* 差异表 #21 计数: 隐式熄灭却发现自己还亮着 = 显式熄灭帧漏过了 */
+            g_buff_rx.imp_off++;
+        }
     }
     if (tgt != s_slv)
     {

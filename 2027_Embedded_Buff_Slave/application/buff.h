@@ -74,10 +74,17 @@ typedef struct
      * cmd 只保留"最后一条有效帧": 4Hz 窗口内别人的帧后到, 会吃掉发给本机的熄灭帧
      * —— 等于把老单缓冲覆盖缺陷搬进业务层。所以收帧当场按老 Decode 的匹配规则锁存:
      *   0x01/0x02 必须 [3]或[5]==本机板号; 0x03/0x04 广播不看板号。
+     *   ★大符额外一条(差异表 #21): 0x02 点亮帧若 is_big 且本板不在 [3]/[5] 里 →
+     *     按"熄灭"处理(隐式熄灭)。作用 = 熄灭帧万一丢失, 下一轮点亮帧到达时残留板
+     *     自己灭掉, 不会出现"3 块板同时亮"。小符不加(打过的板要保持亮环数)。
      * 1ms 的 buff_tick() 消费 my_ev_valid 做状态转换(150ms 熄灯对不能塌进 4Hz 窗)。 */
     volatile uint8_t  my_ev_cmd;    /* 最近一条"与本板有关"的命令 */
     volatile uint8_t  my_ev_valid;  /* 1=有未消费事件 */
     volatile uint32_t my_ev_seq;    /* 每条命中/广播帧 +1(观测用) */
+    volatile uint8_t  my_ev_implicit;   /* 1=该事件来自隐性熄灭(差异表 #21) */
+    volatile uint32_t imp_off;      /* 差异表 #21: **清理掉一个还亮着的残留板**的次数
+                                     * (= 熄灭帧确实漏过)。正常轮次恒为 0: 不在本轮的板
+                                     * 早已被显式熄灭帧灭掉, 隐式熄灭只是幂等 no-op。 */
 } buff_rx_t;
 
 extern volatile buff_rx_t g_buff_rx;
