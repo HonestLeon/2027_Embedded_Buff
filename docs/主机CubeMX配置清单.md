@@ -4,7 +4,10 @@
 > 用途：2026 赛季能量机关（大符/小符）固件重构，从零新建 .ioc
 > 依据：`原理图/SCH_F405_2026-10-02.pdf`（4 页：主控 / 端子 / 硬件消抖 / 电源，V1.0，重绘日期 2026-01-26）
 > 参考教程：`../../CubeMX基础配置.md`（含 `../../CubeMX基础配置.zip`；本清单沿用其操作步骤与截图，
-> 截图存于 `../../图片和附件/`）—— 教程在仓库之外，本清单是唯一的工程内出处。
+> 截图存于 `../../图片和附件/`）—— 教程与截图都在仓库之外，本清单是唯一的工程内出处；
+> 仓库内的图片引用已删除（2026-10 文档整理），按本节文字描述操作即可。
+> **改完怎么校验、踩过的坑**（DMA 方向反了、EXTI 双边沿、CAN 默认值、寄存器级判定表）
+> 已集中到 `CubeMX校验与踩坑.md`，本清单只负责"该配成什么值、依据是什么"。
 >
 > ⚠️ **重要前提**：本原理图就是 2025 赛季旧代码运行的同一块 PCB（主从共用板，主从分别烧录）。
 > 原理图核对时已与旧 master/slave 固件、旧 master `BUFF2024.ioc` 交叉验证。
@@ -107,8 +110,6 @@
 > （如 `PA6`）或外设名（如 `can1`）可以快速定位可配置引脚；
 > 中文输入法会重复输入两次导致搜索失败。
 >
-> ![引脚快速搜索](图片和附件/image%2015.png)
-
 ---
 
 ## 2. System Core：RCC / SYS / DMA / NVIC
@@ -121,11 +122,6 @@
 |---|---|
 | HSE | **Crystal/Ceramic Resonator**（本板 X1 为 8MHz 无源晶振，已确认） |
 | LSE | Disable（不用 RTC） |
-
-![RCC 选择 Crystal/Ceramic Resonator](图片和附件/image%202.png)
-
-![RCC HSE/LSE 选项](图片和附件/image%2013.png)
-
 > 教程原话：一般选择 Crystal/Ceramic Resonator 让时钟起振，否则外部时钟不会工作；
 > 只用内部时钟才选 Disable。
 >
@@ -142,9 +138,6 @@
 |---|---|
 | Debug | **Serial Wire** |
 | Timebase Source | **SysTick**（保持默认） |
-
-![SYS Debug 选择 Serial Wire](图片和附件/image%2021.png)
-
 > 教程原话：**一定要记得选烧录方式，选 Disable 会使芯片"上锁"**（无法再 SWD 烧录）。
 >
 > 两个理由必须用 Serial Wire 而不是完整 JTAG：
@@ -197,7 +190,7 @@
 | 中断 | Pre-emption | Sub | 说明 |
 |---|---|---|---|
 | CAN1_RX0_IRQn | **1** | 0 | 主从互联，最高业务优先级：1Mbps 下帧间隔 111µs |
-| CAN2_RX0_IRQn | **1** | 1 | 电机反馈 |
+| CAN2_RX0_IRQn | **1** | 0 | 电机反馈（`.ioc` 实测值 1/0；旧文档写 1/1 是笔误） |
 | TIM6_DAC_IRQn | **2** | 0 | 1ms 节拍，中断内只置标志 |
 | EXTI1_IRQn ~ EXTI4_IRQn | **3** | 0 | KEY1~4 |
 | EXTI9_5_IRQn | **3** | 0 | KEY5(PA5) + KEY6~9(PC6~9)，回调内按 GPIO_Pin 分发 |
@@ -225,13 +218,6 @@
 6. SYSCLK Mux 选 **PLLCLK**；
 7. AHB = /1 → **HCLK = 168MHz**；
 8. APB1 = /4 → **42MHz**；APB2 = /2 → **84MHz**。
-
-![时钟树默认状态（HSE 灰色）](图片和附件/image%2040.png)
-
-![时钟树配置顺序：input frequency → HSE → HCLK](图片和附件/image%205.png)
-
-![时钟树配置完成参考](图片和附件/image%2019.png)
-
 **填完后的检查点（必查）**：
 
 | 检查项 | 期望值 |
@@ -340,10 +326,7 @@
 > 配完CAN1后必须到引脚图上确认 CAN1 落在 PA11/PA12，
 > 若不对就在芯片图上直接点击 PA11 选 `CAN1_RX`、PA12 选 `CAN1_TX`。
 >
-> ![CAN 默认引脚可能不对](图片和附件/image%208.png)
 >
-> ![确认实际使用的 CAN 引脚](图片和附件/image%2016.png)
-
 **② 位率参数**（Parameter Settings）：
 
 计算公式（教程给出）：**波特率 = PCLK1 / Prescaler / (1 + Tq1 + Tq2)**，其中 PCLK1 = APB1 = 42MHz。
@@ -360,21 +343,11 @@
 | ReSynchronization Jump Width | 1 | |
 
 更多 1Mbps 组合见附录 C；**CAN1 波特率已由旧从机生成代码确认（1Mbps）**，见 0.3 结案项。
-
-![CAN 位率参数计算页面](图片和附件/image%2022.png)
-
-![CAN 位率参数填写](图片和附件/image.png)
-
-![先配 Tq 再配 Prescaler 的操作顺序](图片和附件/image%2041.png)
-
 **③ 中断**：NVIC 页勾选 **CAN1 RX0 interrupt**（抢占 1，子 0）。
 
 > 教程说"一般需要用到所有的 FIFO，所以 RX0 和 RX1 的接收中断都需要开启"；
 > 本工程过滤器全部指向 FIFO0（见 9.3），所以**只需 RX0**。
 > 若你把过滤器分配到了 FIFO1，才需要把 RX1 也勾上。
-
-![CAN 接收中断使能](图片和附件/image%2039.png)
-
 ### 5.2 CAN2 —— 电机控制总线（发 0x200，收 0x201~0x204）
 
 **Connectivity → CAN2 → Activated** ✅，引脚 **PB12=CAN2_RX、PB13=CAN2_TX**（与旧 .ioc 一致）。
@@ -498,15 +471,6 @@ EXTI 触发沿：**从机构建必须配 `Falling`（下降沿）** —— 依�
 
 1. 勾选 **DSP Library**；
 2. 勾选后齿轮图标会消失，**记得再确认 DSP Library 已处于启用（勾选）状态**。
-
-![点击带齿轮的 X-CUBE-ALGOBUILD](图片和附件/image%209.png)
-
-![勾选 DSP Library](图片和附件/image%2017.png)
-
-![确认 DSP Library 启用](图片和附件/image%2035.png)
-
-![DSP 库启用成功状态](图片和附件/image%2027.png)
-
 > 启用后工程会自动包含 CMSIS-DSP 头文件路径与库文件，代码里
 > `#include "arm_math.h"` 即可；Keil 下还会自动加 `arm_cortexM4lf_math.lib`
 > （旧工程里那个孤零零的 `.lib` 就是这么来的，新工程不需要手工拷）。
